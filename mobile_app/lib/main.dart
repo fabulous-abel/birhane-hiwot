@@ -309,10 +309,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
   }
 
   void _launchAdminWebsite() async {
-    final Uri adminUrl = Uri.parse(
-        'http://localhost:3000'); // Change this to your admin panel URL
+    final Uri adminUrl =
+        Uri.parse('http://localhost:3000'); // Frontend admin panel
     if (!await launchUrl(adminUrl)) {
-      throw Exception('Could not launch admin panel');
+      // Fallback to localhost:4000 if 3000 isn't available
+      final fallbackUrl = Uri.parse('http://localhost:4000');
+      if (!await launchUrl(fallbackUrl)) {
+        throw Exception('Could not launch admin panel');
+      }
     }
   }
 

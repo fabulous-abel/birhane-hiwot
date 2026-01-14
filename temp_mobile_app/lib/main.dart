@@ -2,11 +2,15 @@ import "dart:convert";
 
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
+import 'package:url_launcher/url_launcher.dart';
 
 enum AppLanguage { en, am }
 
 const String apiBaseUrl = String.fromEnvironment("API_BASE_URL",
-    defaultValue: "https://app-lilac-phi.vercel.app/");
+    defaultValue: "http://localhost:4000");
+
+// Store admin credentials
+bool isAdminLoggedIn = false;
 
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
@@ -34,6 +38,15 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "new": "New",
     "all": "All",
     "failedLoadPosts": "Failed to load posts. Check API connection.",
+    "adminLogin": "Admin Login",
+    "username": "Username",
+    "password": "Password",
+    "login": "Login",
+    "cancel": "Cancel",
+    "loginSuccess": "Login successful!",
+    "invalidCredentials": "Invalid username or password.",
+    "adminPanel": "Admin Panel",
+    "adminPanelMsg": "You are logged in as admin. Access admin features here.",
   },
   AppLanguage.am: {
     "appTitle": "ፖስቶች",
@@ -60,6 +73,15 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "new": "አዲስ",
     "all": "ሁሉም",
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
+    "adminLogin": "የአስተዳዳሪ ግiriş",
+    "username": "የተጠቃሚ ስም",
+    "password": "የይለፍ ቃል",
+    "login": "ግቤት",
+    "cancel": "ሰርዝ",
+    "loginSuccess": "ግቤቱ ተሳክቷል!",
+    "invalidCredentials": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል።",
+    "adminPanel": "የአስተዳዳሪ ፓነል",
+    "adminPanelMsg": "እርስዎ እንደ አስተዳዳሪ በገቡዋል። እዚህ የአስተዳዳሪ ተግባራትን ይድረሳሉ።",
   }
 };
 
@@ -227,6 +249,75 @@ class _PostsHomePageState extends State<PostsHomePage> {
         );
       },
     );
+  }
+
+  void _showAdminLoginDialog() {
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(_t("adminLogin")),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameController,
+                decoration: InputDecoration(
+                  labelText: _t("username"),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: _t("password"),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_t("cancel")),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validate credentials
+                if (usernameController.text == "Abel" &&
+                    passwordController.text == "123") {
+                  isAdminLoggedIn = true;
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_t("loginSuccess"))),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_t("invalidCredentials"))),
+                  );
+                }
+              },
+              child: Text(_t("login")),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _launchAdminWebsite() async {
+    final Uri adminUrl =
+        Uri.parse('http://localhost:3000'); // Frontend admin panel
+    if (!await launchUrl(adminUrl)) {
+      // Fallback to localhost:4000 if 3000 isn't available
+      final fallbackUrl = Uri.parse('http://localhost:4000');
+      if (!await launchUrl(fallbackUrl)) {
+        throw Exception('Could not launch admin panel');
+      }
+    }
   }
 
   void _showNotificationsSheet() {
@@ -555,6 +646,22 @@ class _PostsHomePageState extends State<PostsHomePage> {
             onTap: () {
               Navigator.pop(context);
               _showDrawerMessage(_t("about"), _t("aboutBody"));
+            },
+          ),
+          const Divider(),
+          ListTile(
+            leading: Icon(isAdminLoggedIn
+                ? Icons.admin_panel_settings
+                : Icons.lock_outline),
+            title: Text(isAdminLoggedIn ? _t("adminPanel") : _t("adminLogin")),
+            onTap: () {
+              Navigator.pop(context);
+              if (isAdminLoggedIn) {
+                // Launch the admin website
+                _launchAdminWebsite();
+              } else {
+                _showAdminLoginDialog();
+              }
             },
           ),
         ],

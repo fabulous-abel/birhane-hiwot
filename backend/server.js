@@ -22,8 +22,74 @@ let notificationsCollection;
 let categoriesCollection;
 let subcategoriesCollection;
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+// Enhanced health check endpoint
+app.get("/health", async (req, res) => {
+  try {
+    // Check if MongoDB connection is alive
+    await client.db().admin().ping();
+    
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: "connected",
+      version: process.env.npm_package_version || "1.0.0"
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      error: "Database connection failed",
+      message: error.message
+    });
+  }
+});
+
+// Detailed health check endpoint
+app.get("/health-details", async (req, res) => {
+  try {
+    // Check database connection
+    const dbPing = await client.db().admin().ping();
+    
+    // Get database stats
+    const dbStats = await client.db().stats();
+    
+    // Get collections info
+    const collections = await client.db().collections();
+    
+    res.status(200).json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: {
+        status: "connected",
+        name: process.env.DB_NAME || "lyrics",
+        collections: collections.length,
+        dataSize: dbStats.dataSize,
+        storageSize: dbStats.storageSize,
+        indexes: dbStats.indexes,
+        indexSize: dbStats.indexSize
+      },
+      server: {
+        host: req.get('host'),
+        ip: req.ip,
+        protocol: req.protocol,
+        secure: req.secure
+      },
+      version: process.env.npm_package_version || "1.0.0",
+      environment: process.env.NODE_ENV || "development"
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      database: {
+        status: "disconnected",
+        error: error.message
+      },
+      version: process.env.npm_package_version || "1.0.0"
+    });
+  }
 });
 
 async function listPosts(_req, res) {
