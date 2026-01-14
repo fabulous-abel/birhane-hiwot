@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-01-13T19:00:00Z",
+  "items": [
+    {
+      "id": "65f1c1ab12e3a4b56789c012",
+      "title": "Example Post",
+      "teacher": "Guest Speaker",
+      "category": "Sunday Service",
+      "subCategory": "Morning",
+      "artist": "Demo Artist",
+      "body": "Line 1\nLine 2\nLine 3",
+      "language": "en",
+      "tags": ["worship", "choir"],
+      "updatedAt": "2026-01-13T18:55:00Z"
+    }
+  ]
+}

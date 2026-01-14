@@ -1,0 +1,10 @@
+{
+  "name": "Lyrics Admin",
+  "short_name": "LyricsAdmin",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#284B63",
+  "description": "Lyrics admin dashboard",
+  "icons": []
+}

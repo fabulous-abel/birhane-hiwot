@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/posts-pack.schema.json",
+  "title": "PostsPack",
+  "type": "object",
+  "required": ["version", "generatedAt", "items"],
+  "properties": {
+    "version": { "type": "string" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/post" }
+    }
+  },
+  "$defs": {
+    "post": {
+      "type": "object",
+      "required": ["id", "title", "body", "updatedAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "teacher": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "artist": { "type": "string" },
+        "body": { "type": "string" },
+        "language": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
