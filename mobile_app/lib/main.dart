@@ -11,6 +11,10 @@ const String apiBaseUrl = String.fromEnvironment("API_BASE_URL",
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
+const validAdmins = {
+  "Abel": "123",
+  "Admin2": "123",
+};
 
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
@@ -287,8 +291,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
             ElevatedButton(
               onPressed: () {
                 // Validate credentials
-                if (usernameController.text == "Abel" &&
-                    passwordController.text == "123") {
+                if (validAdmins[usernameController.text] ==
+                    passwordController.text) {
                   isAdminLoggedIn = true;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
