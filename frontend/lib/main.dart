@@ -5,7 +5,7 @@ import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 
 const String apiBaseUrl = String.fromEnvironment("API_BASE_URL",
-    defaultValue: "http://localhost:4000/");
+    defaultValue: "https://fabulous-abel-birhane-hiwot.vercel.app/");
 
 const Color _brandInk = Color(0xFF18232B);
 const Color _brandOcean = Color(0xFF1F4A6E);
