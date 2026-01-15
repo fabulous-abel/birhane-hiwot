@@ -4,4 +4,10 @@ export const config = {
   runtime: "nodejs20.x"
 };
 
-export default app;
+const handler = (req, res) => {
+  const originalUrl = req.url || "";
+  req.url = originalUrl.replace(/^\/api/, "") || "/";
+  return app(req, res);
+};
+
+export default handler;
