@@ -170,6 +170,18 @@ async function createPost(req, res) {
       updatedAt: now
     };
     const result = await postsCollection.insertOne(post);
+    try {
+      const totalPosts = await postsCollection.countDocuments();
+      await notificationsCollection.insertOne({
+        message: `New post published – total posts: ${totalPosts}.`,
+        createdAt: new Date()
+      });
+    } catch (notificationError) {
+      console.error(
+        "Failed to create post notification:",
+        notificationError
+      );
+    }
     res.status(201).json({ ...post, _id: result.insertedId });
   } catch (err) {
     res.status(500).json({ error: "Failed to create post." });

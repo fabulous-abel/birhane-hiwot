@@ -36,6 +36,11 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "about": "About",
     "aboutBody": "Posts app for viewing lyrics shared by the admin.",
     "new": "New",
+    "search": "Search",
+    "searchHint": "Search posts by title, teacher, or category",
+    "categoryFilter": "Category",
+    "searchResults": "Search results",
+    "noSearchResults": "No matching posts found.",
     "all": "All",
     "failedLoadPosts": "Failed to load posts. Check API connection.",
     "adminLogin": "Admin Login",
@@ -71,6 +76,11 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "about": "ስለ መተግበሪያው",
     "aboutBody": "አስተዳዳሪው የሚጋራውን የመዝሙር ፖስቶች ለማየት መተግበሪያ።",
     "new": "አዲስ",
+    "search": "Search",
+    "searchHint": "Search posts by title, teacher, or category",
+    "categoryFilter": "Category",
+    "searchResults": "Search results",
+    "noSearchResults": "No matching posts found.",
     "all": "ሁሉም",
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
     "adminLogin": "የአስተዳዳሪ ግiriş",
@@ -120,9 +130,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
   bool _loading = false;
   bool _loadingNotifications = false;
   String? _error;
-  String _selectedCategory = "All";
+  String _selectedCategory = _strings[AppLanguage.am]?["all"] ?? "All";
+  String _searchCategory = _strings[AppLanguage.am]?["all"] ?? "All";
+  String _searchQuery = "";
   int _navIndex = 1;
-  AppLanguage _language = AppLanguage.en;
+  AppLanguage _language = AppLanguage.am;
 
   String _t(String key) {
     return _strings[_language]?[key] ?? key;
@@ -285,7 +297,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
               child: Text(_t("cancel")),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 // Validate credentials
                 if (usernameController.text == "Abel" &&
                     passwordController.text == "123") {
@@ -294,6 +306,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_t("loginSuccess"))),
                   );
+                  await _launchAdminWebsite();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_t("invalidCredentials"))),
@@ -309,15 +322,19 @@ class _PostsHomePageState extends State<PostsHomePage> {
   }
 
   void _launchAdminWebsite() async {
-    final Uri adminUrl =
-        Uri.parse('http://localhost:3000'); // Frontend admin panel
-    if (!await launchUrl(adminUrl)) {
-      // Fallback to localhost:4000 if 3000 isn't available
-      final fallbackUrl = Uri.parse('http://localhost:4000');
-      if (!await launchUrl(fallbackUrl)) {
-        throw Exception('Could not launch admin panel');
+    const adminPanelUrls = [
+      "https://fabulous-abel-birhane-hiwot.vercel.app/",
+      "https://fabulous-abel-birhane-hiwot.vercel.app/admin",
+    ];
+
+    for (final url in adminPanelUrls) {
+      final uri = Uri.parse(url);
+      if (await launchUrl(uri)) {
+        return;
       }
     }
+
+    throw Exception('Could not launch admin panel');
   }
 
   void _showNotificationsSheet() {
@@ -378,6 +395,175 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  void _showSearchSheet() {
+    final searchController = TextEditingController(text: _searchQuery);
+    String activeCategory = _searchCategory;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final categories = _categories;
+              final effectiveCategory = categories.contains(activeCategory)
+                  ? activeCategory
+                  : (categories.isNotEmpty ? categories.first : _t("all"));
+              final trimmedQuery = searchController.text.trim();
+              final results =
+                  _filterPostsForSearch(effectiveCategory, trimmedQuery);
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.75,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _t("searchResults"),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            labelText: _t("searchHint"),
+                            prefixIcon: const Icon(Icons.search),
+                          ),
+                          onChanged: (value) {
+                            setModalState(() {});
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: categories.contains(effectiveCategory)
+                              ? effectiveCategory
+                              : null,
+                          items: categories
+                              .map(
+                                (category) => DropdownMenuItem(
+                                  value: category,
+                                  child: Text(category),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            activeCategory = value;
+                            setModalState(() {});
+                            setState(() {
+                              _searchCategory = value;
+                            });
+                          },
+                          decoration: InputDecoration(
+                            labelText: _t("categoryFilter"),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: results.isEmpty
+                              ? Center(
+                                  child: Text(_t("noSearchResults")),
+                                )
+                              : ListView.separated(
+                                  itemCount: results.length,
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (context, index) {
+                                    final post = results[index];
+                                    final title =
+                                        post["title"]?.toString() ??
+                                            _t("untitled");
+                                    final teacher = post["teacher"]
+                                            ?.toString()
+                                            .trim() ??
+                                        "";
+                                    final category = post["category"]
+                                            ?.toString()
+                                            .trim() ??
+                                        "";
+                                    final artist = post["artist"]
+                                            ?.toString()
+                                            .trim() ??
+                                        "";
+                                    final subtitle = [
+                                      teacher,
+                                      category,
+                                      artist
+                                    ]
+                                        .where((value) => value.isNotEmpty)
+                                        .join(" - ");
+                                    return ListTile(
+                                      title: Text(title),
+                                      subtitle: subtitle.isEmpty
+                                          ? null
+                                          : Text(subtitle),
+                                      onTap: () => _showPost(post),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    ).whenComplete(() => searchController.dispose());
+  }
+
+  List<Map<String, dynamic>> _filterPostsForSearch(
+    String category,
+    String query,
+  ) {
+    final normalizedQuery = query.toLowerCase();
+    return _posts.where((post) {
+      if (!_matchesSearchCategory(post, category)) {
+        return false;
+      }
+      if (normalizedQuery.isEmpty) {
+        return true;
+      }
+      final searchableParts = [
+        post["title"]?.toString(),
+        post["body"]?.toString(),
+        post["teacher"]?.toString(),
+        post["category"]?.toString(),
+        post["artist"]?.toString(),
+      ];
+      final searchable = searchableParts
+          .where((value) => value != null && value.isNotEmpty)
+          .map((value) => value!.toLowerCase())
+          .join(" ");
+      return searchable.contains(normalizedQuery);
+    }).toList();
+  }
+
+  bool _matchesSearchCategory(Map<String, dynamic> post, String category) {
+    if (category == _t("all")) {
+      return true;
+    }
+    final postCategory = post["category"]?.toString() ?? "";
+    if (postCategory == category) {
+      return true;
+    }
+    final rawTags = post["tags"];
+    if (rawTags is List) {
+      return rawTags.map((tag) => tag.toString()).contains(category);
+    }
+    return false;
+  }
+
   void _handleNavTap(int index) {
     setState(() {
       _navIndex = index;
@@ -388,6 +574,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       return;
     }
     if (index == 1) {
+      _showSearchSheet();
       return;
     }
     _showDrawerMessage(_t("profile"), _t("profileSoon"));
@@ -460,6 +647,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                     ? AppLanguage.am
                     : AppLanguage.en;
                 _selectedCategory = _t("all");
+                _searchCategory = _t("all");
+                _searchQuery = "";
               });
             },
             child: Text(_language == AppLanguage.en ? "አማ" : "EN"),
@@ -532,8 +721,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
             label: _t("notifications"),
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.add_circle_outline),
-            label: _t("new"),
+            icon: const Icon(Icons.search),
+            label: _t("search"),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.person_outline),
