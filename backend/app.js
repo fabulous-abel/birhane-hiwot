@@ -7,6 +7,11 @@ dotenv.config();
 
 const app = express();
 const uri = process.env.MONGODB_URI;
+const corsOptions = {
+  origin: (origin, callback) => callback(null, true),
+  credentials: true,
+  optionsSuccessStatus: 200
+};
 
 if (!uri) {
   throw new Error("MONGODB_URI is required.");
@@ -50,7 +55,19 @@ const ensureCollections = async () => {
   await initPromise;
 };
 
-app.use(cors());
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express.json({ limit: "2mb" }));
 
 // Enhanced health check endpoint
