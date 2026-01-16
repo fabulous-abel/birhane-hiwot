@@ -10,6 +10,7 @@ const app = express();
 const uri = process.env.MONGODB_URI;
 const DEFAULT_ADMIN_USERNAME = process.env.DEFAULT_ADMIN_USERNAME ?? "Abel";
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? "123";
+const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE ?? "super";
 const ADMIN_SALT_ROUNDS =
   Number.parseInt(process.env.ADMIN_SALT_ROUNDS ?? "10", 10) || 10;
 const corsOptions = {
@@ -78,9 +79,13 @@ const ensureDefaultAdmin = async () => {
   await adminsCollection.updateOne(
     { username: DEFAULT_ADMIN_USERNAME },
     {
+      $set: {
+        passwordHash,
+        role: DEFAULT_ADMIN_ROLE,
+        isSuperAdmin: true
+      },
       $setOnInsert: {
         username: DEFAULT_ADMIN_USERNAME,
-        passwordHash,
         createdAt: new Date()
       }
     },
