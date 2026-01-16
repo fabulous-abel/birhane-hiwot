@@ -2,12 +2,16 @@ import "dart:convert";
 
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
+import "package:share_plus/share_plus.dart";
 import 'package:url_launcher/url_launcher.dart';
+import "package:webview_flutter/webview_flutter.dart";
 
 enum AppLanguage { en, am }
 
 const String apiBaseUrl =
     "https://fabulous-abel-birhane-hiwot.vercel.app/";
+const String adminPanelUrl =
+    "https://fabulous-abel-birhane-hiwot.vercel.app/admin";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
@@ -41,6 +45,11 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "categoryFilter": "Category",
     "searchResults": "Search results",
     "noSearchResults": "No matching posts found.",
+    "favorites": "Favorites",
+    "favoriteEmpty": "No favorites yet.",
+    "favoriteAdded": "Added to favorites.",
+    "favoriteRemoved": "Removed from favorites.",
+    "share": "Share",
     "all": "All",
     "failedLoadPosts": "Failed to load posts. Check API connection.",
     "adminLogin": "Admin Login",
@@ -76,12 +85,16 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "about": "ስለ መተግበሪያው",
     "aboutBody": "አስተዳዳሪው የሚጋራውን የመዝሙር ፖስቶች ለማየት መተግበሪያ።",
     "new": "አዲስ",
-    "search": "Search",
-    "searchHint": "Search posts by title, teacher, or category",
-    "categoryFilter": "Category",
-    "searchResults": "Search results",
-    "noSearchResults": "No matching posts found.",
-    "all": "ሁሉም",
+    "search": "ፈልግ",
+    "searchHint": "በርዕስ፣ መምህር ወይም ምድብ ይፈልጉ",
+    "categoryFilter": "ምድብ",
+    "searchResults": "የፈለጉ ውጤቶች",
+    "noSearchResults": "ተመሳሳይ ውጤቶች አልተገኙም።",
+    "favorites": "ተወዳጆች",
+    "favoriteEmpty": "አሁን ድረስ የተወደዱ አልተገኙም።",
+    "favoriteAdded": "ወደ ተወዳጅ ተጨምሯል።",
+    "favoriteRemoved": "ከተወዳጅ ዝውውር ተሰርዟል።",
+    "share": "አጋር",
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
     "adminLogin": "የአስተዳዳሪ ግiriş",
     "username": "የተጠቃሚ ስም",
@@ -135,6 +148,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
   String _searchQuery = "";
   int _navIndex = 1;
   AppLanguage _language = AppLanguage.am;
+  final TextEditingController _searchController = TextEditingController();
+  final Set<String> _favoriteIds = {};
 
   String _t(String key) {
     return _strings[_language]?[key] ?? key;
@@ -150,6 +165,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -297,7 +313,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
               child: Text(_t("cancel")),
             ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: () {
                 // Validate credentials
                 if (usernameController.text == "Abel" &&
                     passwordController.text == "123") {
@@ -306,7 +322,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_t("loginSuccess"))),
                   );
-                  await _launchAdminWebsite();
+                  _openAdminPanelScreen();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(_t("invalidCredentials"))),
@@ -321,20 +337,13 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
-  void _launchAdminWebsite() async {
-    const adminPanelUrls = [
-      "https://fabulous-abel-birhane-hiwot.vercel.app/",
-      "https://fabulous-abel-birhane-hiwot.vercel.app/admin",
-    ];
-
-    for (final url in adminPanelUrls) {
-      final uri = Uri.parse(url);
-      if (await launchUrl(uri)) {
-        return;
-      }
-    }
-
-    throw Exception('Could not launch admin panel');
+  void _openAdminPanelScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AdminPanelPage(),
+      ),
+    );
   }
 
   void _showNotificationsSheet() {
@@ -477,35 +486,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                   separatorBuilder: (_, __) =>
                                       const Divider(height: 1),
                                   itemBuilder: (context, index) {
-                                    final post = results[index];
-                                    final title =
-                                        post["title"]?.toString() ??
-                                            _t("untitled");
-                                    final teacher = post["teacher"]
-                                            ?.toString()
-                                            .trim() ??
-                                        "";
-                                    final category = post["category"]
-                                            ?.toString()
-                                            .trim() ??
-                                        "";
-                                    final artist = post["artist"]
-                                            ?.toString()
-                                            .trim() ??
-                                        "";
-                                    final subtitle = [
-                                      teacher,
-                                      category,
-                                      artist
-                                    ]
-                                        .where((value) => value.isNotEmpty)
-                                        .join(" - ");
-                                    return ListTile(
-                                      title: Text(title),
-                                      subtitle: subtitle.isEmpty
-                                          ? null
-                                          : Text(subtitle),
-                                      onTap: () => _showPost(post),
+                                    return _buildPostTile(
+                                      results[index],
+                                      onFavoriteToggled: () =>
+                                          setModalState(() {}),
                                     );
                                   },
                                 ),
@@ -522,12 +506,175 @@ class _PostsHomePageState extends State<PostsHomePage> {
     ).whenComplete(() => searchController.dispose());
   }
 
+  List<Map<String, dynamic>> get _favoritePosts {
+    return _posts
+        .where((post) => _favoriteIds.contains(_postId(post)))
+        .toList();
+  }
+
+  String _postId(Map<String, dynamic> post) {
+    return post["_id"]?.toString() ??
+        post["id"]?.toString() ??
+        post["title"]?.toString() ??
+        post["body"]?.toString() ??
+        post.hashCode.toString();
+  }
+
+  bool _isFavorite(Map<String, dynamic> post) {
+    return _favoriteIds.contains(_postId(post));
+  }
+
+  void _toggleFavorite(
+    Map<String, dynamic> post, {
+    VoidCallback? onUpdated,
+  }) {
+    final id = _postId(post);
+    final willFavorite = !_favoriteIds.contains(id);
+    setState(() {
+      if (willFavorite) {
+        _favoriteIds.add(id);
+      } else {
+        _favoriteIds.remove(id);
+      }
+    });
+    onUpdated?.call();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_t(willFavorite ? "favoriteAdded" : "favoriteRemoved")),
+      ),
+    );
+  }
+
+  Future<void> _sharePost(Map<String, dynamic> post) async {
+    final title = post["title"]?.toString() ?? _t("untitled");
+    final body = post["body"]?.toString() ?? "";
+    final message = "$title\n\n${body.trim()}";
+    try {
+      await Share.share(message, subject: title);
+    } catch (err) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${_t("share")} failed.")),
+      );
+    }
+  }
+
+  Widget _buildPostTile(
+    Map<String, dynamic> post, {
+    VoidCallback? onFavoriteToggled,
+  }) {
+    final title = post["title"]?.toString() ?? _t("untitled");
+    final teacher = post["teacher"]?.toString().trim() ?? "";
+    final category = post["category"]?.toString().trim() ?? "";
+    final artist = post["artist"]?.toString().trim() ?? "";
+    final subtitle = [teacher, category, artist]
+        .where((value) => value.isNotEmpty)
+        .join(" - ");
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.3),
+        ),
+      ),
+      child: ListTile(
+        title: Text(title),
+        subtitle: subtitle.isEmpty ? null : Text(subtitle),
+        onTap: () => _showPost(post),
+        trailing: SizedBox(
+          width: 96,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isFavorite(post) ? Icons.favorite : Icons.favorite_border,
+                  color: _isFavorite(post) ? Colors.red : null,
+                ),
+                tooltip: _t("favorites"),
+                onPressed: () =>
+                    _toggleFavorite(post, onUpdated: onFavoriteToggled),
+              ),
+              IconButton(
+                icon: const Icon(Icons.share_outlined),
+                tooltip: _t("share"),
+                onPressed: () => _sharePost(post),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFavoritesSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final favorites = _favoritePosts;
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          _t("favorites"),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: _t("refresh"),
+                          onPressed: () {
+                            _fetchPosts();
+                            setModalState(() {});
+                          },
+                          icon: const Icon(Icons.refresh),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: favorites.isEmpty
+                          ? Center(
+                              child: Text(_t("favoriteEmpty")),
+                            )
+                          : ListView.separated(
+                              itemCount: favorites.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                return _buildPostTile(
+                                  favorites[index],
+                                  onFavoriteToggled: () =>
+                                      setModalState(() {}),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
   List<Map<String, dynamic>> _filterPostsForSearch(
     String category,
-    String query,
-  ) {
+    String query, {
+    List<Map<String, dynamic>>? source,
+  }) {
     final normalizedQuery = query.toLowerCase();
-    return _posts.where((post) {
+    final postsToSearch = source ?? _posts;
+    return postsToSearch.where((post) {
       if (!_matchesSearchCategory(post, category)) {
         return false;
       }
@@ -577,6 +724,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _showSearchSheet();
       return;
     }
+    if (index == 2) {
+      _showFavoritesSheet();
+      return;
+    }
     _showDrawerMessage(_t("profile"), _t("profileSoon"));
   }
 
@@ -614,8 +765,21 @@ class _PostsHomePageState extends State<PostsHomePage> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> get _searchFilteredPosts {
+    final base = _visiblePosts;
+    if (_searchQuery.isEmpty && _searchCategory == _t("all")) {
+      return base;
+    }
+    return _filterPostsForSearch(
+      _searchCategory,
+      _searchQuery,
+      source: base,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final postsToShow = _searchFilteredPosts;
     return Scaffold(
       drawer: _buildDrawer(),
       appBar: AppBar(
@@ -649,6 +813,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 _selectedCategory = _t("all");
                 _searchCategory = _t("all");
                 _searchQuery = "";
+                _searchController.clear();
               });
             },
             child: Text(_language == AppLanguage.en ? "አማ" : "EN"),
@@ -665,10 +830,66 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 style: const TextStyle(color: Colors.red),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _t("search"),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        labelText: _t("searchHint"),
+                        prefixIcon: const Icon(Icons.search),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _categories.contains(_searchCategory)
+                          ? _searchCategory
+                          : _t("all"),
+                      items: _categories
+                          .map(
+                            (category) => DropdownMenuItem(
+                              value: category,
+                              child: Text(category),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _searchCategory = value;
+                          _selectedCategory = value;
+                          _searchQuery = "";
+                          _searchController.clear();
+                        });
+                      },
+                      decoration: InputDecoration(
+                        labelText: _t("categoryFilter"),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _visiblePosts.isEmpty
+                : postsToShow.isEmpty
                     ? Center(
                         child: Text(_t("noPosts")),
                       )
@@ -680,29 +901,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
                             Expanded(
                               child: ListView.separated(
                                 controller: _scrollController,
-                                itemCount: _visiblePosts.length,
+                                itemCount: postsToShow.length,
                                 separatorBuilder: (_, __) =>
                                     const Divider(height: 1),
                                 itemBuilder: (context, index) {
-                                  final post = _visiblePosts[index];
-                                  final title = post["title"]?.toString() ??
-                                      _t("untitled");
-                                  final teacher =
-                                      post["teacher"]?.toString().trim() ?? "";
-                                  final category =
-                                      post["category"]?.toString().trim() ?? "";
-                                  final artist =
-                                      post["artist"]?.toString() ?? "";
-                                  final subtitle = [teacher, category, artist]
-                                      .where((value) => value.isNotEmpty)
-                                      .join(" - ");
-                                  return ListTile(
-                                    title: Text(title),
-                                    subtitle: subtitle.isEmpty
-                                        ? null
-                                        : Text(subtitle),
-                                    onTap: () => _showPost(post),
-                                  );
+                                  return _buildPostTile(postsToShow[index]);
                                 },
                               ),
                             ),
@@ -723,6 +926,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.search),
             label: _t("search"),
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.favorite_border),
+            label: _t("favorites"),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.person_outline),
@@ -815,6 +1022,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
               onTap: () {
                 setState(() {
                   _selectedCategory = category;
+                  _searchCategory = category;
+                  _searchQuery = "";
+                  _searchController.clear();
                 });
                 Navigator.pop(context);
               },
@@ -846,13 +1056,91 @@ class _PostsHomePageState extends State<PostsHomePage> {
             onTap: () {
               Navigator.pop(context);
               if (isAdminLoggedIn) {
-                // Launch the admin website
-                _launchAdminWebsite();
+                _openAdminPanelScreen();
               } else {
                 _showAdminLoginDialog();
               }
             },
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminPanelPage extends StatefulWidget {
+  const AdminPanelPage({super.key});
+
+  @override
+  State<AdminPanelPage> createState() => _AdminPanelPageState();
+}
+
+class _AdminPanelPageState extends State<AdminPanelPage> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            setState(() => _isLoading = true);
+          },
+          onPageFinished: (_) {
+            setState(() => _isLoading = false);
+          },
+          onWebResourceError: (_) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Failed to load admin panel.")),
+            );
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(adminPanelUrl));
+  }
+
+  Future<void> _openInBrowser() async {
+    final uri = Uri.parse(adminPanelUrl);
+    final opened =
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Unable to open in browser.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Admin Panel"),
+        actions: [
+          IconButton(
+            tooltip: "Open externally",
+            icon: const Icon(Icons.open_in_browser),
+            onPressed: _openInBrowser,
+          ),
+          IconButton(
+            tooltip: "Refresh",
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _controller.reload(),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Align(
+              alignment: Alignment.topCenter,
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
         ],
       ),
     );
