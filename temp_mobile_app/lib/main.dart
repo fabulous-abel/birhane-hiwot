@@ -3,15 +3,13 @@ import "dart:convert";
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:share_plus/share_plus.dart";
-import 'package:url_launcher/url_launcher.dart';
-import "package:webview_flutter/webview_flutter.dart";
+
+import "admin_dashboard.dart" as admin;
 
 enum AppLanguage { en, am }
 
 const String apiBaseUrl =
     "https://fabulous-abel-birhane-hiwot.vercel.app/";
-const String adminPanelUrl =
-    "https://fabulous-abel-birhane-hiwot.vercel.app/admin";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
@@ -334,15 +332,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
           ],
         );
       },
-    );
-  }
-
-  void _openAdminPanelScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AdminPanelPage(),
-      ),
     );
   }
 
@@ -1066,82 +1055,12 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
     );
   }
-}
 
-class AdminPanelPage extends StatefulWidget {
-  const AdminPanelPage({super.key});
-
-  @override
-  State<AdminPanelPage> createState() => _AdminPanelPageState();
-}
-
-class _AdminPanelPageState extends State<AdminPanelPage> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            setState(() => _isLoading = true);
-          },
-          onPageFinished: (_) {
-            setState(() => _isLoading = false);
-          },
-          onWebResourceError: (_) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Failed to load admin panel.")),
-            );
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(adminPanelUrl));
-  }
-
-  Future<void> _openInBrowser() async {
-    final uri = Uri.parse(adminPanelUrl);
-    final opened =
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Unable to open in browser.")),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("Admin Panel"),
-        actions: [
-          IconButton(
-            tooltip: "Open externally",
-            icon: const Icon(Icons.open_in_browser),
-            onPressed: _openInBrowser,
-          ),
-          IconButton(
-            tooltip: "Refresh",
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _controller.reload(),
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Align(
-              alignment: Alignment.topCenter,
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
-        ],
+  void _openAdminPanelScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const admin.PostsAdminApp(),
       ),
     );
   }
