@@ -4,10 +4,7 @@ export const config = {
   runtime: "nodejs"
 };
 
-const handler = (req, res) => {
-  const originalUrl = req.url || "";
-  req.url = originalUrl.replace(/^\/api/, "") || "/";
-  return app(req, res);
-};
+// Keep the original request path so the Express routes that include "/api" stay reachable.
+const handler = (req, res) => app(req, res);
 
 export default handler;
