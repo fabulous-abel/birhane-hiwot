@@ -57,6 +57,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "cancel": "Cancel",
     "loginSuccess": "Login successful!",
     "invalidCredentials": "Invalid username or password.",
+    "adminLoginFailed": "Failed to log in to admin.",
     "adminPanel": "Admin Panel",
     "adminPanelMsg": "You are logged in as admin. Access admin features here.",
   },
@@ -101,6 +102,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "cancel": "ሰርዝ",
     "loginSuccess": "ግቤቱ ተሳክቷል!",
     "invalidCredentials": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል።",
+    "adminLoginFailed": "Failed to log in to admin.",
     "adminPanel": "የአስተዳዳሪ ፓነል",
     "adminPanelMsg": "እርስዎ እንደ አስተዳዳሪ በገቡዋል። እዚህ የአስተዳዳሪ ተግባራትን ይድረሳሉ።",
   }
@@ -140,6 +142,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = false;
   bool _loadingNotifications = false;
+  bool _adminLoginInProgress = false;
   String? _error;
   String _selectedCategory = _strings[AppLanguage.am]?["all"] ?? "All";
   String _searchCategory = _strings[AppLanguage.am]?["all"] ?? "All";
@@ -283,7 +286,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text(_t("adminLogin")),
           content: Column(
@@ -307,32 +310,87 @@ class _PostsHomePageState extends State<PostsHomePage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text(_t("cancel")),
             ),
-            ElevatedButton(
-              onPressed: () {
-                // Validate credentials
-                if (usernameController.text == "Abel" &&
-                    passwordController.text == "123") {
-                  isAdminLoggedIn = true;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_t("loginSuccess"))),
-                  );
-                  _openAdminPanelScreen();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_t("invalidCredentials"))),
-                  );
-                }
+            StatefulBuilder(
+              builder: (context, setDialogState) {
+                return ElevatedButton(
+                  onPressed: _adminLoginInProgress
+                      ? null
+                      : () async {
+                          final username = usernameController.text.trim();
+                          final password = passwordController.text.trim();
+                          if (username.isEmpty || password.isEmpty) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text(_t("invalidCredentials"))),
+                            );
+                            return;
+                          }
+                          setState(() => _adminLoginInProgress = true);
+                          setDialogState(() {});
+                          final success = await _authenticateAdmin(
+                            username: username,
+                            password: password,
+                          );
+                          if (!mounted) return;
+                          setState(() => _adminLoginInProgress = false);
+                          setDialogState(() {});
+                          if (!success) return;
+                          isAdminLoggedIn = true;
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(content: Text(_t("loginSuccess"))),
+                          );
+                          _openAdminPanelScreen();
+                        },
+                  child: _adminLoginInProgress
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(_t("login")),
+                );
               },
-              child: Text(_t("login")),
             ),
           ],
         );
       },
     );
+  }
+
+  Future<bool> _authenticateAdmin({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$apiBaseUrl/api/admins/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": username, "password": password}),
+      );
+      if (response.statusCode == 200) {
+        return true;
+      }
+      final message =
+          _extractErrorMessage(response, _t("invalidCredentials"));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      return false;
+    } catch (err) {
+      final message = err is http.ClientException
+          ? err.message
+          : _t("adminLoginFailed");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      return false;
+    }
   }
 
   void _showNotificationsSheet() {
@@ -718,6 +776,22 @@ class _PostsHomePageState extends State<PostsHomePage> {
       return;
     }
     _showDrawerMessage(_t("profile"), _t("profileSoon"));
+  }
+
+  String _extractErrorMessage(http.Response response, String fallback) {
+    if (response.body.isEmpty) {
+      return fallback;
+    }
+    try {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) {
+        final message = data["error"] ?? data["message"];
+        if (message is String && message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+    return fallback;
   }
 
   List<String> get _categories {

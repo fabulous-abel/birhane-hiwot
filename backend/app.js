@@ -1,12 +1,17 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 import { MongoClient, ObjectId } from "mongodb";
 
 dotenv.config();
 
 const app = express();
 const uri = process.env.MONGODB_URI;
+const DEFAULT_ADMIN_USERNAME = process.env.DEFAULT_ADMIN_USERNAME ?? "Abel";
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? "123";
+const ADMIN_SALT_ROUNDS =
+  Number.parseInt(process.env.ADMIN_SALT_ROUNDS ?? "10", 10) || 10;
 const corsOptions = {
   origin: (origin, callback) => callback(null, true),
   credentials: true,
@@ -22,8 +27,10 @@ let postsCollection;
 let notificationsCollection;
 let categoriesCollection;
 let subcategoriesCollection;
+let adminsCollection;
 let initPromise;
 let collectionsInitialized = false;
+let defaultAdminEnsured = false;
 
 const ensureCollections = async () => {
   if (collectionsInitialized) {
@@ -48,11 +55,38 @@ const ensureCollections = async () => {
       subcategoriesCollection = db.collection(
         process.env.SUBCATEGORIES_COLLECTION || "subcategories"
       );
+      adminsCollection = db.collection(
+        process.env.ADMINS_COLLECTION || "admins"
+      );
       collectionsInitialized = true;
     })();
   }
 
   await initPromise;
+  await ensureDefaultAdmin();
+};
+
+const ensureDefaultAdmin = async () => {
+  if (defaultAdminEnsured) return;
+  if (!adminsCollection) {
+    throw new Error("Admins collection is not initialized.");
+  }
+  const passwordHash = await bcrypt.hash(
+    DEFAULT_ADMIN_PASSWORD,
+    ADMIN_SALT_ROUNDS
+  );
+  await adminsCollection.updateOne(
+    { username: DEFAULT_ADMIN_USERNAME },
+    {
+      $setOnInsert: {
+        username: DEFAULT_ADMIN_USERNAME,
+        passwordHash,
+        createdAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+  defaultAdminEnsured = true;
 };
 
 app.use(cors(corsOptions));
@@ -252,6 +286,67 @@ async function deletePost(req, res) {
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: "Failed to delete post." });
+  }
+}
+
+async function createAdmin(req, res) {
+  try {
+    await ensureCollections();
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ error: "Username and password are required." });
+    }
+    const normalizedUsername = username.toString().trim();
+    if (!normalizedUsername) {
+      return res.status(400).json({ error: "Invalid username." });
+    }
+    const existing = await adminsCollection.findOne({
+      username: normalizedUsername
+    });
+    if (existing) {
+      return res.status(409).json({ error: "Admin already exists." });
+    }
+    const passwordHash = await bcrypt.hash(password.toString(), ADMIN_SALT_ROUNDS);
+    const admin = {
+      username: normalizedUsername,
+      passwordHash,
+      createdAt: new Date()
+    };
+    const result = await adminsCollection.insertOne(admin);
+    res.status(201).json({ username: normalizedUsername, _id: result.insertedId });
+  } catch (err) {
+    console.error("createAdmin error", err);
+    res.status(500).json({ error: "Failed to create admin." });
+  }
+}
+
+async function loginAdmin(req, res) {
+  try {
+    await ensureCollections();
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ error: "Username and password are required." });
+    }
+    const normalizedUsername = username.toString().trim();
+    const admin = await adminsCollection.findOne({
+      username: normalizedUsername
+    });
+    if (!admin) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+    const passwordHash = admin.passwordHash || "";
+    const match = await bcrypt.compare(password.toString(), passwordHash);
+    if (!match) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+    res.json({ username: admin.username });
+  } catch (err) {
+    console.error("loginAdmin error", err);
+    res.status(500).json({ error: "Failed to authenticate admin." });
   }
 }
 
@@ -485,6 +580,9 @@ app.delete("/api/subcategories/:id", async (req, res) => {
     res.status(400).json({ error: "Failed to delete subcategory." });
   }
 });
+
+app.post("/api/admins", createAdmin);
+app.post("/api/admins/login", loginAdmin);
 
 export { ensureCollections };
 export default app;

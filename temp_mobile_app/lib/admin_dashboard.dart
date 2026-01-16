@@ -81,6 +81,12 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "failedLoadPosts": "Failed to load posts. Check API connection.",
     "failedSavePost": "Failed to save post.",
     "failedDeletePost": "Failed to delete post.",
+    "addAdmin": "Add admin",
+    "createAdmin": "Create admin",
+    "adminUsername": "Admin username",
+    "adminPassword": "Admin password",
+    "adminCreated": "Admin account created.",
+    "adminCreationFailed": "Failed to create admin."
   },
   AppLanguage.am: {
     "appTitle": "የጽሑፍ አስተዳዳሪ",
@@ -145,6 +151,12 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
     "failedSavePost": "ፖስት መቀመጥ አልተሳካም።",
     "failedDeletePost": "ፖስት መሰረዝ አልተሳካም።",
+    "addAdmin": "Add admin",
+    "createAdmin": "Create admin",
+    "adminUsername": "Admin username",
+    "adminPassword": "Admin password",
+    "adminCreated": "Admin account created.",
+    "adminCreationFailed": "Failed to create admin."
   }
 };
 
@@ -272,6 +284,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   bool _sendingNotification = false;
   bool _loadingCategories = false;
   bool _loadingSubcategories = false;
+  bool _addingAdmin = false;
   String? _editingId;
   String? _error;
   String? _notificationStatus;
@@ -990,6 +1003,120 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  Future<bool> _createAdminAccount({
+    required String username,
+    required String password,
+  }) async {
+    setState(() {
+      _addingAdmin = true;
+    });
+    try {
+      final response = await http.post(
+        Uri.parse("$adminApiBaseUrl/api/admins"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": username, "password": password}),
+      );
+      if (response.statusCode >= 400) {
+        final message =
+            _parseErrorMessage(response, _t("adminCreationFailed"));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+        return false;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("adminCreated"))),
+      );
+      return true;
+    } catch (err) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("adminCreationFailed"))),
+      );
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _addingAdmin = false;
+        });
+      }
+    }
+  }
+
+  void _showAddAdminDialog() {
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t("addAdmin")),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameController,
+                decoration: InputDecoration(labelText: _t("adminUsername")),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: _t("adminPassword")),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(_t("cancel")),
+            ),
+            StatefulBuilder(
+              builder: (context, setDialogState) {
+                return ElevatedButton(
+                  onPressed: _addingAdmin
+                      ? null
+                      : () async {
+                          final username = usernameController.text.trim();
+                          final password = passwordController.text.trim();
+                          if (username.isEmpty || password.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(_t("adminCreationFailed"))),
+                            );
+                            return;
+                          }
+                          setDialogState(() {});
+                          final success = await _createAdminAccount(
+                            username: username,
+                            password: password,
+                          );
+                          if (!mounted) return;
+                          setDialogState(() {});
+                          if (!success) return;
+                          Navigator.pop(dialogContext);
+                        },
+                  child: _addingAdmin
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(_t("createAdmin")),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    ).whenComplete(() {
+      usernameController.dispose();
+      passwordController.dispose();
+    });
+  }
+
   void _clearForm() {
     _editingId = null;
     _titleController.clear();
@@ -1164,6 +1291,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
             icon: Icons.settings_outlined,
             label: _t("settings"),
             onTap: () => Navigator.of(context).pop(),
+          ),
+          ListTile(
+            leading: const Icon(Icons.person_add),
+            title: Text(_t("addAdmin")),
+            onTap: () {
+              Navigator.of(context).pop();
+              _showAddAdminDialog();
+            },
           ),
           const Spacer(),
           Padding(
@@ -1613,6 +1748,22 @@ class _PostsHomePageState extends State<PostsHomePage> {
         return _buildLyricTile(lyric);
       },
     );
+  }
+
+  String _parseErrorMessage(http.Response response, String fallback) {
+    if (response.body.isEmpty) {
+      return fallback;
+    }
+    try {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) {
+        final message = data["error"] ?? data["message"];
+        if (message is String && message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+    return fallback;
   }
 
   Widget _buildLyricTile(Lyric lyric) {
