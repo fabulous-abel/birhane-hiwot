@@ -1,13 +1,25 @@
 import "dart:convert";
 
+import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import 'package:url_launcher/url_launcher.dart';
 
 enum AppLanguage { en, am }
 
-const String apiBaseUrl = String.fromEnvironment("API_BASE_URL",
-    defaultValue: "http://localhost:4000");
+const String _localApiBaseUrl = "http://localhost:4000/";
+const String _remoteApiBaseUrl =
+    "https://fabulous-abel-birhane-hiwot.vercel.app/";
+const String _envApiBaseUrl = String.fromEnvironment("API_BASE_URL");
+
+late final String apiBaseUrl = _resolveApiBaseUrl();
+
+String _resolveApiBaseUrl() {
+  if (_envApiBaseUrl.isNotEmpty) {
+    return _envApiBaseUrl;
+  }
+  return kDebugMode ? _localApiBaseUrl : _remoteApiBaseUrl;
+}
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
