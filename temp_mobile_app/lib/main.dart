@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 enum AppLanguage { en, am }
 
 const String apiBaseUrl = String.fromEnvironment("API_BASE_URL",
-    defaultValue: "http://localhost:4000");
+    defaultValue: "https://fabulous-abel-birhane-hiwot.vercel.app/");
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
