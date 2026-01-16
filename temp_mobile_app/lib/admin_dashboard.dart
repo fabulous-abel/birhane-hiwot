@@ -400,8 +400,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
 
   Future<void> _deleteLyric(String id) async {
     try {
-      final response =
-          await http.delete(Uri.parse("$adminApiBaseUrl/api/posts/$id"));
+      final response = await http.delete(
+        Uri.parse("$adminApiBaseUrl/api/posts")
+            .replace(queryParameters: {"id": id}),
+      );
       if (response.statusCode >= 400) {
         throw Exception("Failed to delete post.");
       }

@@ -8,8 +8,7 @@ import "admin_dashboard.dart" as admin;
 
 enum AppLanguage { en, am }
 
-const String apiBaseUrl =
-    "https://fabulous-abel-birhane-hiwot.vercel.app/";
+const String apiBaseUrl = "https://fabulous-abel-birhane-hiwot.vercel.app/";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
@@ -376,16 +375,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
       if (response.statusCode == 200) {
         return true;
       }
-      final message =
-          _extractErrorMessage(response, _t("invalidCredentials"));
+      final message = _extractErrorMessage(response, _t("invalidCredentials"));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
       return false;
     } catch (err) {
-      final message = err is http.ClientException
-          ? err.message
-          : _t("adminLoginFailed");
+      final message =
+          err is http.ClientException ? err.message : _t("adminLoginFailed");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -698,8 +695,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                               itemBuilder: (context, index) {
                                 return _buildPostTile(
                                   favorites[index],
-                                  onFavoriteToggled: () =>
-                                      setModalState(() {}),
+                                  onFavoriteToggled: () => setModalState(() {}),
                                 );
                               },
                             ),
@@ -885,6 +881,91 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       body: Column(
         children: [
+          Container(
+            height: 120.0,
+            margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8.0),
+              child: PageView(
+                children: List.generate(
+                    5,
+                    (i) => Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                spreadRadius: 2,
+                                blurRadius: 5,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8.0),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Image display with fallback
+                                Container(
+                                  color: [
+                                    Colors.redAccent,
+                                    Colors.blueAccent,
+                                    Colors.greenAccent,
+                                    Colors.yellowAccent,
+                                    Colors.purpleAccent
+                                  ][i],
+                                  child: Image.asset(
+                                    'assets/images/carousel_\${i + 1}.jpg',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: [
+                                          Colors.redAccent,
+                                          Colors.blueAccent,
+                                          Colors.greenAccent,
+                                          Colors.yellowAccent,
+                                          Colors.purpleAccent
+                                        ][i],
+                                      );
+                                    },
+                                  ),
+                                ),
+                                // Semi-transparent overlay
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withOpacity(0.7),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Text overlay
+                                Align(
+                                  alignment: Alignment.bottomLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Text(
+                                      'Image \${i + 1}',
+                                      style: const TextStyle(
+                                        fontSize: 20.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )),
+              ),
+            ),
+          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -980,6 +1061,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _navIndex,
+        selectedItemColor: const Color(0xFFE05E40),
         onTap: _handleNavTap,
         items: [
           BottomNavigationBarItem(

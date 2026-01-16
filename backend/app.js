@@ -271,17 +271,44 @@ async function updatePost(req, res) {
   }
 }
 
+async function attemptDeletePostById(id) {
+  if (!ObjectId.isValid(id)) {
+    return { status: 400, error: "Invalid post id." };
+  }
+  const result = await postsCollection.deleteOne({
+    _id: new ObjectId(id)
+  });
+  if (result.deletedCount === 0) {
+    return { status: 404, error: "Not found." };
+  }
+  return { status: 200 };
+}
+
 async function deletePost(req, res) {
   try {
     await ensureCollections();
-    if (!ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({ error: "Invalid post id." });
+    const { status, error } = await attemptDeletePostById(req.params.id);
+    if (status !== 200) {
+      return res.status(status).json({ error });
     }
-    const result = await postsCollection.deleteOne({
-      _id: new ObjectId(req.params.id)
-    });
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ error: "Not found." });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: "Failed to delete post." });
+  }
+}
+
+async function deletePostFromQuery(req, res) {
+  try {
+    await ensureCollections();
+    const queryId = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
+    const candidateId = queryId ?? req.body?.id;
+    const id = candidateId?.toString();
+    if (!id) {
+      return res.status(400).json({ error: "Post id is required." });
+    }
+    const { status, error } = await attemptDeletePostById(id);
+    if (status !== 200) {
+      return res.status(status).json({ error });
     }
     res.json({ ok: true });
   } catch (err) {
@@ -383,6 +410,7 @@ app.get("/api/posts", listPosts);
 app.get("/api/posts/:id", getPost);
 app.post("/api/posts", createPost);
 app.put("/api/posts/:id", updatePost);
+app.delete("/api/posts", deletePostFromQuery);
 app.delete("/api/posts/:id", deletePost);
 app.get("/api/posts/pack", exportPostsPack);
 
@@ -390,6 +418,7 @@ app.get("/api/lyrics", listPosts);
 app.get("/api/lyrics/:id", getPost);
 app.post("/api/lyrics", createPost);
 app.put("/api/lyrics/:id", updatePost);
+app.delete("/api/lyrics", deletePostFromQuery);
 app.delete("/api/lyrics/:id", deletePost);
 app.get("/api/lyrics/pack", exportPostsPack);
 
