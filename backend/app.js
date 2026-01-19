@@ -29,6 +29,7 @@ let notificationsCollection;
 let categoriesCollection;
 let subcategoriesCollection;
 let adminsCollection;
+let carouselCollection;
 let initPromise;
 let collectionsInitialized = false;
 let defaultAdminEnsured = false;
@@ -58,6 +59,9 @@ const ensureCollections = async () => {
       );
       adminsCollection = db.collection(
         process.env.ADMINS_COLLECTION || "admins"
+      );
+      carouselCollection = db.collection(
+        process.env.CAROUSEL_COLLECTION || "carousel"
       );
       collectionsInitialized = true;
     })();
@@ -95,6 +99,7 @@ const ensureDefaultAdmin = async () => {
 };
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -321,6 +326,106 @@ async function deletePostFromQuery(req, res) {
   }
 }
 
+async function listCarouselItems(_req, res) {
+  try {
+    await ensureCollections();
+    const items = await carouselCollection
+      .find()
+      .sort({ order: 1, updatedAt: -1 })
+      .toArray();
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load carousel items." });
+  }
+}
+
+async function createCarouselItem(req, res) {
+  try {
+    await ensureCollections();
+    const imageUrl = (req.body?.imageUrl ?? "").toString().trim();
+    if (!imageUrl) {
+      return res.status(400).json({ error: "Image URL is required." });
+    }
+    const description = (req.body?.description ?? "").toString().trim();
+    const now = new Date();
+    const orderValue = req.body?.order;
+    const order =
+      orderValue != null && !Number.isNaN(Number(orderValue))
+        ? Number(orderValue)
+        : now.getTime();
+    const payload = {
+      imageUrl,
+      description,
+      order,
+      createdAt: now,
+      updatedAt: now
+    };
+    const result = await carouselCollection.insertOne(payload);
+    res.status(201).json({ ...payload, _id: result.insertedId });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to save carousel item." });
+  }
+}
+
+async function updateCarouselItem(req, res) {
+  try {
+    await ensureCollections();
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid carousel item id." });
+    }
+    const imageUrlRaw = req.body?.imageUrl;
+    const descriptionRaw = req.body?.description;
+    const orderRaw = req.body?.order;
+    const update = {};
+    if (imageUrlRaw !== undefined) {
+      const trimmed = imageUrlRaw?.toString().trim() ?? "";
+      if (!trimmed) {
+        return res.status(400).json({ error: "Image URL is required." });
+      }
+      update.imageUrl = trimmed;
+    }
+    if (descriptionRaw !== undefined) {
+      update.description = descriptionRaw?.toString().trim() ?? "";
+    }
+    if (orderRaw !== undefined) {
+      const parsed = Number(orderRaw);
+      if (!Number.isNaN(parsed)) {
+        update.order = parsed;
+      }
+    }
+    update.updatedAt = new Date();
+
+    const result = await carouselCollection.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: update },
+      { returnDocument: "after" }
+    );
+
+    if (!result.value) return res.status(404).json({ error: "Not found." });
+    res.json(result.value);
+  } catch (err) {
+    res.status(400).json({ error: "Failed to update carousel item." });
+  }
+}
+
+async function deleteCarouselItem(req, res) {
+  try {
+    await ensureCollections();
+    if (!ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid carousel item id." });
+    }
+    const result = await carouselCollection.deleteOne({
+      _id: new ObjectId(req.params.id)
+    });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Not found." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: "Failed to delete carousel item." });
+  }
+}
+
 async function createAdmin(req, res) {
   try {
     await ensureCollections();
@@ -457,6 +562,11 @@ app.post("/api/notifications", async (req, res) => {
     res.status(500).json({ error: "Failed to create notification." });
   }
 });
+
+app.get("/api/carousel", listCarouselItems);
+app.post("/api/carousel", createCarouselItem);
+app.put("/api/carousel/:id", updateCarouselItem);
+app.delete("/api/carousel/:id", deleteCarouselItem);
 
 app.get("/api/categories", async (_req, res) => {
   try {

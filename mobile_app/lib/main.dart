@@ -1,5 +1,7 @@
 import "dart:convert";
 
+import "dart:math" as math;
+
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:share_plus/share_plus.dart";
@@ -9,7 +11,7 @@ import "admin_dashboard.dart" as admin;
 enum AppLanguage { en, am }
 
 const String apiBaseUrl =
-    "https://fabulous-abel-birhane-hiwot.vercel.app/";
+    "https://fabulous-abel-birhane-hiwot.vercel.app";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
@@ -113,6 +115,14 @@ Future<void> main() async {
   runApp(const PostsMobileApp());
 }
 
+
+const _carouselAssetPaths = [
+  "assets/images/carousel_1.jpg",
+  "assets/images/carousel_2.jpg",
+  "assets/images/carousel_3.jpg",
+  "assets/images/carousel_4.jpg",
+  "assets/images/carousel_5.jpg",
+];
 class PostsMobileApp extends StatelessWidget {
   const PostsMobileApp({super.key});
 
@@ -885,6 +895,101 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       body: Column(
         children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
+              final carouselWidth =
+                  math.min(maxCarouselWidth, 400).toDouble(); // reduce horizontal width
+              return Center(
+                child: SizedBox(
+                  width: carouselWidth,
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Container(
+                      margin:
+                          const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16.0),
+                        child: PageView.builder(
+                          itemCount: _carouselAssetPaths.length,
+                          controller: PageController(viewportFraction: 0.92),
+                          itemBuilder: (context, index) {
+                            return Container(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 6.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    spreadRadius: 2,
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16.0),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.asset(
+                                      _carouselAssetPaths[index],
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return Container(
+                                          color: Colors.grey.shade300,
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.broken_image,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            Colors.black.withOpacity(0.65),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.bottomLeft,
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.all(16.0),
+                                        child: Text(
+                                          'Worship every season',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),

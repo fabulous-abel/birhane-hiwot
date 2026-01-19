@@ -1,5 +1,7 @@
 import "dart:convert";
 
+import "dart:math" as math;
+
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:share_plus/share_plus.dart";
@@ -8,10 +10,32 @@ import "admin_dashboard.dart" as admin;
 
 enum AppLanguage { en, am }
 
-const String apiBaseUrl = "https://fabulous-abel-birhane-hiwot.vercel.app/";
+const String apiBaseUrl = "https://fabulous-abel-birhane-hiwot.vercel.app";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
+
+class CarouselSlide {
+  final String imageUrl;
+  final String description;
+  final bool isAsset;
+
+  const CarouselSlide({
+    required this.imageUrl,
+    required this.description,
+    this.isAsset = true,
+  });
+
+  factory CarouselSlide.fromJson(Map<String, dynamic> json) {
+    final imageUrl = json["imageUrl"]?.toString().trim() ?? "";
+    final description = json["description"]?.toString() ?? "";
+    return CarouselSlide(
+      imageUrl: imageUrl,
+      description: description,
+      isAsset: false,
+    );
+  }
+}
 
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
@@ -112,6 +136,30 @@ Future<void> main() async {
   runApp(const PostsMobileApp());
 }
 
+const List<CarouselSlide> _defaultCarouselSlides = [
+  CarouselSlide(
+    imageUrl: "assets/images/carousel_1.jpg",
+    description: "Worship every season",
+  ),
+  CarouselSlide(
+    imageUrl: "assets/images/carousel_2.jpg",
+    description: "Let the words rise like incense",
+  ),
+  CarouselSlide(
+    imageUrl: "assets/images/carousel_3.jpg",
+    description: "Songs that carry your story",
+  ),
+  CarouselSlide(
+    imageUrl: "assets/images/carousel_4.jpg",
+    description: "A melody for every dawn",
+  ),
+  CarouselSlide(
+    imageUrl: "assets/images/carousel_5.jpg",
+    description: "Lyrics rooted in grace",
+  ),
+];
+const String _fallbackCarouselDescription = "Worship every season";
+
 class PostsMobileApp extends StatelessWidget {
   const PostsMobileApp({super.key});
 
@@ -139,6 +187,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _posts = [];
   List<Map<String, dynamic>> _notifications = [];
+  List<CarouselSlide> _carouselSlides = _defaultCarouselSlides;
   bool _loading = false;
   bool _loadingNotifications = false;
   bool _adminLoginInProgress = false;
@@ -160,6 +209,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     super.initState();
     _fetchPosts();
     _fetchNotifications();
+    _fetchCarouselSlides();
   }
 
   @override
@@ -219,6 +269,67 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _loadingNotifications = false;
       });
     }
+  }
+
+  Future<void> _fetchCarouselSlides() async {
+    try {
+      final response = await http.get(Uri.parse("$apiBaseUrl/api/carousel"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to load carousel slides.");
+      }
+      final data = jsonDecode(response.body) as List<dynamic>;
+      final slides = data
+          .whereType<Map<String, dynamic>>()
+          .map(CarouselSlide.fromJson)
+          .where((slide) => slide.imageUrl.isNotEmpty)
+          .toList();
+      setState(() {
+        _carouselSlides =
+            slides.isNotEmpty ? slides : _defaultCarouselSlides;
+      });
+    } catch (_) {
+      setState(() {
+        _carouselSlides = _defaultCarouselSlides;
+      });
+    }
+  }
+
+  Widget _buildCarouselImage(CarouselSlide slide) {
+    if (slide.isAsset) {
+      return Image.asset(
+        slide.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: _buildCarouselImageError,
+      );
+    }
+    return Image.network(
+      slide.imageUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const Center(
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
+      errorBuilder: _buildCarouselImageError,
+    );
+  }
+
+  Widget _buildCarouselImageError(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+  ) {
+    return Container(
+      color: Colors.grey.shade300,
+      child: const Center(
+        child: Icon(Icons.broken_image, color: Colors.grey),
+      ),
+    );
   }
 
   void _showPost(Map<String, dynamic> post) {
@@ -881,90 +992,87 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       body: Column(
         children: [
-          Container(
-            height: 120.0,
-            margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: PageView(
-                children: List.generate(
-                    5,
-                    (i) => Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8.0),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                // Image display with fallback
-                                Container(
-                                  color: [
-                                    Colors.redAccent,
-                                    Colors.blueAccent,
-                                    Colors.greenAccent,
-                                    Colors.yellowAccent,
-                                    Colors.purpleAccent
-                                  ][i],
-                                  child: Image.asset(
-                                    'assets/images/carousel_\${i + 1}.jpg',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: [
-                                          Colors.redAccent,
-                                          Colors.blueAccent,
-                                          Colors.greenAccent,
-                                          Colors.yellowAccent,
-                                          Colors.purpleAccent
-                                        ][i],
-                                      );
-                                    },
-                                  ),
-                                ),
-                                // Semi-transparent overlay
-                                Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.transparent,
-                                        Colors.black.withOpacity(0.7),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                // Text overlay
-                                Align(
-                                  alignment: Alignment.bottomLeft,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Text(
-                                      'Image \${i + 1}',
-                                      style: const TextStyle(
-                                        fontSize: 20.0,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final slides = _carouselSlides.isEmpty
+                  ? _defaultCarouselSlides
+                  : _carouselSlides;
+              final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
+              final carouselWidth =
+                  math.min(maxCarouselWidth, 400).toDouble(); // keep manageable width
+              return Center(
+                child: SizedBox(
+                  width: carouselWidth,
+                  child: Container(
+                    height: 160.0,
+                    margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16.0),
+                      child: PageView.builder(
+                        itemCount: slides.length,
+                        controller: PageController(viewportFraction: 0.92),
+                        itemBuilder: (context, index) {
+                          final slide = slides[index];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  spreadRadius: 2,
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
                                 ),
                               ],
                             ),
-                          ),
-                        )),
-              ),
-            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16.0),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  _buildCarouselImage(slide),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          Colors.transparent,
+                                          Colors.black.withOpacity(0.65),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.bottomLeft,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Text(
+                                        slide.description.isNotEmpty
+                                            ? slide.description
+                                            : _fallbackCarouselDescription,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           if (_error != null)
             Padding(

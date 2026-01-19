@@ -52,6 +52,19 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "noPosts": "No posts yet.",
     "broadcastTitle": "Broadcast notification",
     "broadcastHint": "Share a quick idea or reminder with everyone in the app.",
+    "carouselTitle": "Carousel slides",
+    "carouselHint": "Adjust the hero carousel image and description.",
+    "carouselImageUrl": "Image URL",
+    "carouselDescription": "Description",
+    "carouselSave": "Save slide",
+    "carouselSaved": "Carousel slide saved.",
+    "carouselSaveFailed": "Failed to save carousel slide.",
+    "carouselDeleteFailed": "Failed to delete carousel slide.",
+    "carouselLoadFailed": "Failed to load carousel slides.",
+    "carouselEmpty": "No carousel slides yet.",
+    "carouselImageUrlRequired": "Image URL is required.",
+    "carouselEdit": "Edit slide",
+    "carouselDelete": "Delete slide",
     "notificationMessage": "Notification message",
     "notificationSent": "Notification sent.",
     "notificationFailed": "Failed to send notification.",
@@ -122,6 +135,20 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "noPosts": "ምንም ፖስት የለም።",
     "broadcastTitle": "ማስታወቂያ ላክ",
     "broadcastHint": "ለሁሉም አንድ ማስታወሻ ወይም ሀሳብ ያጋሩ።",
+    "carouselTitle": "Carousel slides",
+    "carouselHint": "Adjust the hero carousel image and description.",
+    "carouselImageUrl": "Image URL",
+    "carouselDescription": "Description",
+    "carouselSave": "Save slide",
+    "carouselSaved": "Carousel slide saved.",
+    "carouselSaveFailed": "Failed to save carousel slide.",
+    "carouselDeleteFailed": "Failed to delete carousel slide.",
+    "carouselLoadFailed": "Failed to load carousel slides.",
+    "carouselEmpty": "No carousel slides yet.",
+    "carouselImageUrlRequired": "Image URL is required.",
+    "carouselEdit": "Edit slide",
+    "carouselDelete": "Delete slide",
+
     "notificationMessage": "የማስታወቂያ መልዕክት",
     "notificationSent": "ማስታወቂያ ተላክ።",
     "notificationFailed": "ማስታወቂያ ላክ አልተሳካም።",
@@ -274,11 +301,19 @@ class _PostsHomePageState extends State<PostsHomePage> {
 
   final TextEditingController _bodyController = TextEditingController();
   final TextEditingController _notificationController = TextEditingController();
+  final TextEditingController _carouselImageUrlController =
+      TextEditingController();
+  final TextEditingController _carouselDescriptionController =
+      TextEditingController();
   final ScrollController _pageScrollController = ScrollController();
 
   List<Lyric> _lyrics = [];
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _subcategories = [];
+  List<CarouselItem> _carouselItems = [];
+  bool _loadingCarouselItems = false;
+  bool _savingCarouselItem = false;
+  String? _carouselEditingId;
   bool _loading = false;
   bool _heroVisible = false;
   bool _sendingNotification = false;
@@ -300,6 +335,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _loadLyrics();
     _fetchCategories();
     _fetchSubcategories();
+    _fetchCarouselItems();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
@@ -318,6 +354,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
 
     _bodyController.dispose();
     _notificationController.dispose();
+    _carouselImageUrlController.dispose();
+    _carouselDescriptionController.dispose();
     _pageScrollController.dispose();
     super.dispose();
   }
@@ -468,6 +506,38 @@ class _PostsHomePageState extends State<PostsHomePage> {
     }
   }
 
+  Future<void> _fetchCarouselItems() async {
+    if (!mounted) return;
+    setState(() {
+      _loadingCarouselItems = true;
+    });
+    try {
+      final response = await http.get(Uri.parse("$adminApiBaseUrl/api/carousel"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to load carousel slides.");
+      }
+      final data = jsonDecode(response.body) as List<dynamic>;
+      final items = data
+          .whereType<Map<String, dynamic>>()
+          .map(CarouselItem.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _carouselItems = items;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("carouselLoadFailed"))),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _loadingCarouselItems = false;
+      });
+    }
+  }
+
   Future<void> _addSubcategory({
     required String name,
     required String categoryId,
@@ -527,6 +597,93 @@ class _PostsHomePageState extends State<PostsHomePage> {
         SnackBar(content: Text(_t("failedDeleteSubcategory"))),
       );
     }
+  }
+
+  Future<void> _saveCarouselItem() async {
+    final imageUrl = _carouselImageUrlController.text.trim();
+    final description = _carouselDescriptionController.text.trim();
+    if (imageUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("carouselImageUrlRequired"))),
+      );
+      return;
+    }
+    setState(() {
+      _savingCarouselItem = true;
+    });
+    try {
+      final payload = {
+        "imageUrl": imageUrl,
+        "description": description,
+      };
+      final uri = _carouselEditingId == null
+          ? Uri.parse("$adminApiBaseUrl/api/carousel")
+          : Uri.parse("$adminApiBaseUrl/api/carousel/$_carouselEditingId");
+      final response = _carouselEditingId == null
+          ? await http.post(
+              uri,
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode(payload),
+            )
+          : await http.put(
+              uri,
+              headers: {"Content-Type": "application/json"},
+              body: jsonEncode(payload),
+            );
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to save carousel slide.");
+      }
+      await _fetchCarouselItems();
+      if (!mounted) return;
+      _clearCarouselForm();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("carouselSaved"))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("carouselSaveFailed"))),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _savingCarouselItem = false;
+      });
+    }
+  }
+
+  Future<void> _deleteCarouselItem(String id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse("$adminApiBaseUrl/api/carousel/$id"),
+      );
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to delete carousel slide.");
+      }
+      await _fetchCarouselItems();
+      if (_carouselEditingId == id) {
+        _clearCarouselForm();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("carouselDeleteFailed"))),
+      );
+    }
+  }
+
+  void _clearCarouselForm() {
+    _carouselEditingId = null;
+    _carouselImageUrlController.clear();
+    _carouselDescriptionController.clear();
+    setState(() {});
+  }
+
+  void _startCarouselEdit(CarouselItem item) {
+    _carouselEditingId = item.id;
+    _carouselImageUrlController.text = item.imageUrl;
+    _carouselDescriptionController.text = item.description;
+    setState(() {});
   }
 
   String? _selectedCategoryId() {
@@ -1199,6 +1356,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                 _buildFormCard(),
                                 const SizedBox(height: 16),
                                 _buildBroadcastCard(),
+                                const SizedBox(height: 16),
+                                _buildCarouselCard(),
                               ],
                             ),
                           ),
@@ -1221,6 +1380,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   _buildFormCard(),
                   const SizedBox(height: 16),
                   _buildBroadcastCard(),
+                  const SizedBox(height: 16),
+                  _buildCarouselCard(),
                   const SizedBox(height: 16),
                   _buildListCard(isEmbedded: true),
                 ],
@@ -1710,6 +1871,112 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  Widget _buildCarouselCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _t("carouselTitle"),
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _t("carouselHint"),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: _brandInk.withOpacity(0.6)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _carouselImageUrlController,
+              decoration: InputDecoration(labelText: _t("carouselImageUrl")),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _carouselDescriptionController,
+              decoration:
+                  InputDecoration(labelText: _t("carouselDescription")),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _savingCarouselItem ? null : _saveCarouselItem,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(_t("carouselSave")),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _clearCarouselForm,
+                  child: Text(_t("clear")),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_loadingCarouselItems)
+              const Center(child: CircularProgressIndicator())
+            else if (_carouselItems.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  _t("carouselEmpty"),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: _brandInk.withOpacity(0.6)),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _carouselItems.length,
+                separatorBuilder: (_, __) => const Divider(height: 0),
+                itemBuilder: (context, index) {
+                  final item = _carouselItems[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: _brandSand,
+                      child: const Icon(Icons.photo, color: _brandInk),
+                    ),
+                    title: Text(
+                      item.imageUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle:
+                        item.description.isEmpty ? null : Text(item.description),
+                    onTap: () => _startCarouselEdit(item),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: _t("carouselEdit"),
+                          onPressed: () => _startCarouselEdit(item),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: _t("carouselDelete"),
+                          onPressed: () => _deleteCarouselItem(item.id),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildList({required bool isEmbedded}) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -1818,6 +2085,30 @@ class Lyric {
       teacher: json["teacher"]?.toString() ?? "",
       category: json["category"]?.toString() ?? "",
       subCategory: json["subCategory"]?.toString() ?? "",
+    );
+  }
+}
+
+class CarouselItem {
+  CarouselItem({
+    required this.id,
+    required this.imageUrl,
+    required this.description,
+    required this.order,
+  });
+
+  final String id;
+  final String imageUrl;
+  final String description;
+  final int order;
+
+  factory CarouselItem.fromJson(Map<String, dynamic> json) {
+    final orderValue = json["order"];
+    return CarouselItem(
+      id: json["_id"]?.toString() ?? json["id"]?.toString() ?? "",
+      imageUrl: json["imageUrl"]?.toString() ?? "",
+      description: json["description"]?.toString() ?? "",
+      order: orderValue is num ? orderValue.toInt() : 0,
     );
   }
 }
