@@ -66,6 +66,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.am: {
     "appTitle": "ፖስቶች",
     "appName": "ብርሃነ ሕይወት",
+    "all": "ሁሉም",
     "refresh": "አድስ",
     "noPosts": "ምንም ፖስት የለም።",
     "untitled": "ያልተሰየመ",
@@ -89,20 +90,20 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "search": "ፈልግ",
     "searchHint": "በርዕስ፣ መምህር ወይም ምድብ ይፈልጉ",
     "categoryFilter": "ምድብ",
-    "searchResults": "የፈለጉ ውጤቶች",
+    "searchResults": "የተፈለጉት ውጤቶች",
     "noSearchResults": "ተመሳሳይ ውጤቶች አልተገኙም።",
     "favorites": "ተወዳጆች",
     "favoriteEmpty": "አሁን ድረስ የተወደዱ አልተገኙም።",
     "favoriteAdded": "ወደ ተወዳጅ ተጨምሯል።",
     "favoriteRemoved": "ከተወዳጅ ዝውውር ተሰርዟል።",
-    "share": "አጋር",
+    "share": "አጋራ",
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
-    "adminLogin": "የአስተዳዳሪ ግiriş",
+    "adminLogin": "የአስተዳዳሪ ግባ",
     "username": "የተጠቃሚ ስም",
     "password": "የይለፍ ቃል",
-    "login": "ግቤት",
+    "login": "ግባ",
     "cancel": "ሰርዝ",
-    "loginSuccess": "ግቤቱ ተሳክቷል!",
+    "loginSuccess": "መግባቱ ተሳክቷል!",
     "invalidCredentials": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል።",
     "adminLoginFailed": "Failed to log in to admin.",
     "adminPanel": "የአስተዳዳሪ ፓነል",
@@ -116,13 +117,35 @@ Future<void> main() async {
 }
 
 
-const _carouselAssetPaths = [
-  "assets/images/carousel_1.jpg",
-  "assets/images/carousel_2.jpg",
-  "assets/images/carousel_3.jpg",
-  "assets/images/carousel_4.jpg",
-  "assets/images/carousel_5.jpg",
+const List<CarouselSlide> _defaultCarouselSlides = [
+  CarouselSlide(
+    imageUrl:
+        "https://images.unsplash.com/photo-1514986888952-8cd320577b7c?auto=format&fit=crop&w=1200&q=80",
+    description: "Worship every season",
+  ),
+  CarouselSlide(
+    imageUrl:
+        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+    description: "Let the words rise like incense",
+  ),
+  CarouselSlide(
+    imageUrl:
+        "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+    description: "Songs that carry your story",
+  ),
+  CarouselSlide(
+    imageUrl:
+        "https://images.unsplash.com/photo-1500048993953-6bc77b4e76c6?auto=format&fit=crop&w=1200&q=80",
+    description: "A melody for every dawn",
+  ),
+  CarouselSlide(
+    imageUrl:
+        "https://images.unsplash.com/photo-1529443606239-3af4f5f9f9c8?auto=format&fit=crop&w=1200&q=80",
+    description: "Lyrics rooted in grace",
+  ),
 ];
+const String _fallbackCarouselDescription = "Worship every season";
+
 class PostsMobileApp extends StatelessWidget {
   const PostsMobileApp({super.key});
 
@@ -899,14 +922,15 @@ class _PostsHomePageState extends State<PostsHomePage> {
             builder: (context, constraints) {
               final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
               final carouselWidth =
-                  math.min(maxCarouselWidth, 400).toDouble();
-              return Center(
+                  math.min(maxCarouselWidth, 400).toDouble(); // reduce horizontal width
+              return Center()
                 child: SizedBox(
                   width: carouselWidth,
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: Container(
-                      margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+                      margin:
+                          const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16.0),
                         child: PageView.builder(
@@ -914,7 +938,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           controller: PageController(viewportFraction: 0.92),
                           itemBuilder: (context, index) {
                             return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 6.0),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16.0),
                                 boxShadow: [
@@ -934,7 +959,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                     Image.asset(
                                       _carouselAssetPaths[index],
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
                                         return Container(
                                           color: Colors.grey.shade300,
                                           child: const Center(
@@ -961,7 +987,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                     Align(
                                       alignment: Alignment.bottomLeft,
                                       child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
+                                        padding:
+                                            const EdgeInsets.all(16.0),
                                         child: Text(
                                           'Worship every season',
                                           style: Theme.of(context)
@@ -979,7 +1006,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
                               ),
                             );
                           },
-                        ),
                       ),
                     ),
                   ),
