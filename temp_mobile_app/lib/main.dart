@@ -138,23 +138,23 @@ Future<void> main() async {
 
 const List<CarouselSlide> _defaultCarouselSlides = [
   CarouselSlide(
-    imageUrl: "assets/images/carousel_1.jpg",
+    imageUrl: "images/carousel_1.jpg",
     description: "Worship every season",
   ),
   CarouselSlide(
-    imageUrl: "assets/images/carousel_2.jpg",
+    imageUrl: "images/carousel_2.jpg",
     description: "Let the words rise like incense",
   ),
   CarouselSlide(
-    imageUrl: "assets/images/carousel_3.jpg",
+    imageUrl: "images/carousel_3.jpg",
     description: "Songs that carry your story",
   ),
   CarouselSlide(
-    imageUrl: "assets/images/carousel_4.jpg",
+    imageUrl: "images/carousel_4.jpg",
     description: "A melody for every dawn",
   ),
   CarouselSlide(
-    imageUrl: "assets/images/carousel_5.jpg",
+    imageUrl: "images/carousel_5.jpg",
     description: "Lyrics rooted in grace",
   ),
 ];
@@ -284,8 +284,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
           .where((slide) => slide.imageUrl.isNotEmpty)
           .toList();
       setState(() {
-        _carouselSlides =
-            slides.isNotEmpty ? slides : _defaultCarouselSlides;
+        _carouselSlides = slides.isNotEmpty ? slides : _defaultCarouselSlides;
       });
     } catch (_) {
       setState(() {
@@ -998,8 +997,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   ? _defaultCarouselSlides
                   : _carouselSlides;
               final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
-              final carouselWidth =
-                  math.min(maxCarouselWidth, 400).toDouble(); // keep manageable width
+              final carouselWidth = math
+                  .min(maxCarouselWidth, 400)
+                  .toDouble(); // keep manageable width
               return Center(
                 child: SizedBox(
                   width: carouselWidth,
