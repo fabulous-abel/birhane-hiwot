@@ -10,11 +10,32 @@ import "admin_dashboard.dart" as admin;
 
 enum AppLanguage { en, am }
 
-const String apiBaseUrl =
-    "https://fabulous-abel-birhane-hiwot.vercel.app";
+const String apiBaseUrl = "https://fabulous-abel-birhane-hiwot.vercel.app";
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
+
+class CarouselSlide {
+  final String imageUrl;
+  final String description;
+  final bool isAsset;
+
+  const CarouselSlide({
+    required this.imageUrl,
+    required this.description,
+    this.isAsset = false,
+  });
+
+  factory CarouselSlide.fromJson(Map<String, dynamic> json) {
+    final imageUrl = json["imageUrl"]?.toString().trim() ?? "";
+    final description = json["description"]?.toString() ?? "";
+    return CarouselSlide(
+      imageUrl: imageUrl,
+      description: description,
+      isAsset: false,
+    );
+  }
+}
 
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
@@ -116,7 +137,6 @@ Future<void> main() async {
   runApp(const PostsMobileApp());
 }
 
-
 const List<CarouselSlide> _defaultCarouselSlides = [
   CarouselSlide(
     imageUrl:
@@ -173,6 +193,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   final ScrollController _scrollController = ScrollController();
   List<Map<String, dynamic>> _posts = [];
   List<Map<String, dynamic>> _notifications = [];
+  List<CarouselSlide> _carouselSlides = _defaultCarouselSlides;
   bool _loading = false;
   bool _loadingNotifications = false;
   bool _adminLoginInProgress = false;
@@ -194,6 +215,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     super.initState();
     _fetchPosts();
     _fetchNotifications();
+    _fetchCarouselSlides();
   }
 
   @override
@@ -253,6 +275,66 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _loadingNotifications = false;
       });
     }
+  }
+
+  Future<void> _fetchCarouselSlides() async {
+    try {
+      final response = await http.get(Uri.parse("$apiBaseUrl/api/carousel"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to load carousel slides.");
+      }
+      final data = jsonDecode(response.body) as List<dynamic>;
+      final slides = data
+          .whereType<Map<String, dynamic>>()
+          .map(CarouselSlide.fromJson)
+          .where((slide) => slide.imageUrl.isNotEmpty)
+          .toList();
+      setState(() {
+        _carouselSlides = slides.isNotEmpty ? slides : _defaultCarouselSlides;
+      });
+    } catch (_) {
+      setState(() {
+        _carouselSlides = _defaultCarouselSlides;
+      });
+    }
+  }
+
+  Widget _buildCarouselImage(CarouselSlide slide) {
+    if (slide.isAsset) {
+      return Image.asset(
+        slide.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: _buildCarouselImageError,
+      );
+    }
+    return Image.network(
+      slide.imageUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const Center(
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
+      errorBuilder: _buildCarouselImageError,
+    );
+  }
+
+  Widget _buildCarouselImageError(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+  ) {
+    return Container(
+      color: Colors.grey.shade300,
+      child: const Center(
+        child: Icon(Icons.broken_image, color: Colors.grey),
+      ),
+    );
   }
 
   void _showPost(Map<String, dynamic> post) {
@@ -409,16 +491,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
       if (response.statusCode == 200) {
         return true;
       }
-      final message =
-          _extractErrorMessage(response, _t("invalidCredentials"));
+      final message = _extractErrorMessage(response, _t("invalidCredentials"));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
       return false;
     } catch (err) {
-      final message = err is http.ClientException
-          ? err.message
-          : _t("adminLoginFailed");
+      final message =
+          err is http.ClientException ? err.message : _t("adminLoginFailed");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -731,8 +811,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                               itemBuilder: (context, index) {
                                 return _buildPostTile(
                                   favorites[index],
-                                  onFavoriteToggled: () =>
-                                      setModalState(() {}),
+                                  onFavoriteToggled: () => setModalState(() {}),
                                 );
                               },
                             ),
@@ -920,23 +999,25 @@ class _PostsHomePageState extends State<PostsHomePage> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
+              final slides = _carouselSlides.isEmpty
+                  ? _defaultCarouselSlides
+                  : _carouselSlides;
               final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
-              final carouselWidth =
-                  math.min(maxCarouselWidth, 400).toDouble(); // reduce horizontal width
-              return Center()
+              final carouselWidth = math.min(maxCarouselWidth, 200).toDouble();
+              return Center(
                 child: SizedBox(
                   width: carouselWidth,
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: Container(
-                      margin:
-                          const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+                      margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16.0),
                         child: PageView.builder(
-                          itemCount: _carouselAssetPaths.length,
+                          itemCount: slides.length,
                           controller: PageController(viewportFraction: 0.92),
                           itemBuilder: (context, index) {
+                            final slide = slides[index];
                             return Container(
                               margin:
                                   const EdgeInsets.symmetric(horizontal: 6.0),
@@ -956,22 +1037,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    Image.asset(
-                                      _carouselAssetPaths[index],
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.grey.shade300,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.broken_image,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    _buildCarouselImage(slide),
                                     Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
@@ -987,10 +1053,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                     Align(
                                       alignment: Alignment.bottomLeft,
                                       child: Padding(
-                                        padding:
-                                            const EdgeInsets.all(16.0),
+                                        padding: const EdgeInsets.all(16.0),
                                         child: Text(
-                                          'Worship every season',
+                                          slide.description.isNotEmpty
+                                              ? slide.description
+                                              : _fallbackCarouselDescription,
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleMedium
@@ -1006,6 +1073,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                               ),
                             );
                           },
+                        ),
                       ),
                     ),
                   ),
