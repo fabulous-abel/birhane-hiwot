@@ -84,6 +84,8 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminLoginFailed": "Failed to log in to admin.",
     "adminPanel": "Admin Panel",
     "adminPanelMsg": "You are logged in as admin. Access admin features here.",
+    "settings": "Settings",
+    "settingsSoon": "Settings options coming soon.",
   },
   AppLanguage.am: {
     "appTitle": "ፖስቶች",
@@ -130,6 +132,8 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminLoginFailed": "Failed to log in to admin.",
     "adminPanel": "የአስተዳዳሪ ፓነል",
     "adminPanelMsg": "እርስዎ እንደ አስተዳዳሪ በገቡዋል። እዚህ የአስተዳዳሪ ተግባራትን ይድረሳሉ።",
+    "settings": "ቅንብሮች",
+    "settingsSoon": "ቅንብሮቹ በቅርብ ይመጣሉ።",
   }
 };
 
@@ -198,6 +202,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   bool _loading = false;
   bool _loadingNotifications = false;
   bool _adminLoginInProgress = false;
+  static const int _recentPostsLimit = 6;
   String? _error;
   String _selectedCategory = _strings[AppLanguage.am]?["all"] ?? "All";
   String _searchCategory = _strings[AppLanguage.am]?["all"] ?? "All";
@@ -888,6 +893,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _showFavoritesSheet();
       return;
     }
+    if (index == 3) {
+      _showDrawerMessage(_t("settings"), _t("settingsSoon"));
+      return;
+    }
     _showDrawerMessage(_t("profile"), _t("profileSoon"));
   }
 
@@ -953,9 +962,46 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  DateTime? _resolvePostTimestamp(Map<String, dynamic> post) {
+    final rawValue = post["createdAt"] ?? post["updatedAt"];
+    if (rawValue == null) return null;
+    if (rawValue is DateTime) return rawValue;
+    if (rawValue is num) {
+      try {
+        return DateTime.fromMillisecondsSinceEpoch(rawValue.toInt());
+      } catch (_) {
+        return null;
+      }
+    }
+    if (rawValue is String && rawValue.isNotEmpty) {
+      return DateTime.tryParse(rawValue);
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> _recentPostsFrom(
+      List<Map<String, dynamic>> posts) {
+    final sorted = List<Map<String, dynamic>>.from(posts);
+    sorted.sort((a, b) {
+      final aDate =
+          _resolvePostTimestamp(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate =
+          _resolvePostTimestamp(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+    if (sorted.length <= _recentPostsLimit) {
+      return sorted;
+    }
+    return sorted.sublist(0, _recentPostsLimit);
+  }
+
   @override
   Widget build(BuildContext context) {
     final postsToShow = _searchFilteredPosts;
+    final isShowingDefaultList =
+        _searchQuery.isEmpty && _searchCategory == _t("all");
+    final displayPosts =
+        isShowingDefaultList ? _recentPostsFrom(postsToShow) : postsToShow;
     return Scaffold(
       drawer: _buildDrawer(),
       appBar: AppBar(
@@ -1004,7 +1050,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   ? _defaultCarouselSlides
                   : _carouselSlides;
               final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
-              final carouselWidth = math.min(maxCarouselWidth, 200).toDouble();
+              const double targetCarouselWidth = 340;
+              final carouselWidth =
+                  math.min(maxCarouselWidth, targetCarouselWidth).toDouble();
               return Center(
                 child: SizedBox(
                   width: carouselWidth,
@@ -1103,43 +1151,56 @@ class _PostsHomePageState extends State<PostsHomePage> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        labelText: _t("searchHint"),
-                        prefixIcon: const Icon(Icons.search),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _categories.contains(_searchCategory)
-                          ? _searchCategory
-                          : _t("all"),
-                      items: _categories
-                          .map(
-                            (category) => DropdownMenuItem(
-                              value: category,
-                              child: Text(category),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              labelText: _t("searchHint"),
+                              prefixIcon: const Icon(Icons.search),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _searchCategory = value;
-                          _selectedCategory = value;
-                          _searchQuery = "";
-                          _searchController.clear();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        labelText: _t("categoryFilter"),
-                      ),
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 40,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: _categories.map((category) {
+                                  final isSelected =
+                                      category == _searchCategory;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(category),
+                                      selected: isSelected,
+                                      onSelected: (_) {
+                                        setState(() {
+                                          _searchCategory = category;
+                                          _selectedCategory = category;
+                                          _searchQuery = "";
+                                          _searchController.clear();
+                                        });
+                                      },
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1149,7 +1210,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : postsToShow.isEmpty
+                : displayPosts.isEmpty
                     ? Center(
                         child: Text(_t("noPosts")),
                       )
@@ -1161,11 +1222,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
                             Expanded(
                               child: ListView.separated(
                                 controller: _scrollController,
-                                itemCount: postsToShow.length,
+                                itemCount: displayPosts.length,
                                 separatorBuilder: (_, __) =>
                                     const Divider(height: 1),
                                 itemBuilder: (context, index) {
-                                  return _buildPostTile(postsToShow[index]);
+                                  return _buildPostTile(displayPosts[index]);
                                 },
                               ),
                             ),
@@ -1204,8 +1265,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
               label: _t("favorites"),
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outline),
-              label: _t("profile"),
+              icon: const Icon(Icons.settings),
+              label: _t("settings"),
             ),
           ],
         ),
@@ -1240,7 +1301,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                       ?.copyWith(color: Colors.white),
                 ),
                 Text(
-                  _t("browsePosts"),
+                  _t(""),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -1248,14 +1309,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 ),
               ],
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: Text(_t("profile")),
-            onTap: () {
-              Navigator.pop(context);
-              _showDrawerMessage(_t("profile"), _t("profileSoon"));
-            },
           ),
           ListTile(
             leading: const Icon(Icons.wb_sunny_outlined),
@@ -1275,33 +1328,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
               Navigator.pop(context);
               _showDrawerMessage(_t("calendars"), _t("calendarSoon"));
             },
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              _t("categories"),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          ..._categories.map(
-            (category) => ListTile(
-              leading: Icon(
-                category == _selectedCategory
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_unchecked,
-              ),
-              title: Text(category),
-              onTap: () {
-                setState(() {
-                  _selectedCategory = category;
-                  _searchCategory = category;
-                  _searchQuery = "";
-                  _searchController.clear();
-                });
-                Navigator.pop(context);
-              },
-            ),
           ),
           const Divider(),
           ListTile(

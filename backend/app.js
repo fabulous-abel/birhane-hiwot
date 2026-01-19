@@ -487,6 +487,25 @@ async function loginAdmin(req, res) {
   }
 }
 
+async function listAdmins(_req, res) {
+  try {
+    await ensureCollections();
+    const admins = await adminsCollection
+      .find({}, { projection: { username: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.json(
+      admins.map((admin) => ({
+        username: admin.username,
+        createdAt: admin.createdAt ? admin.createdAt.toISOString() : null
+      }))
+    );
+  } catch (err) {
+    console.error("listAdmins error", err);
+    res.status(500).json({ error: "Failed to load admins." });
+  }
+}
+
 async function exportPostsPack(_req, res) {
   try {
     await ensureCollections();
@@ -727,6 +746,7 @@ app.delete("/api/subcategories/:id", async (req, res) => {
 
 app.post("/api/admins", createAdmin);
 app.post("/api/admins/login", loginAdmin);
+app.get("/api/admins", listAdmins);
 
 export { ensureCollections };
 export default app;

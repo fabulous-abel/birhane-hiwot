@@ -86,7 +86,10 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminUsername": "Admin username",
     "adminPassword": "Admin password",
     "adminCreated": "Admin account created.",
-    "adminCreationFailed": "Failed to create admin."
+    "adminCreationFailed": "Failed to create admin.",
+    "adminListTitle": "Admin accounts",
+    "adminListHint": "Visible when adding Abel (123).",
+    "adminListFailed": "Failed to load admin list."
   },
   AppLanguage.am: {
     "appTitle": "የጽሑፍ አስተዳዳሪ",
@@ -156,7 +159,10 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminUsername": "Admin username",
     "adminPassword": "Admin password",
     "adminCreated": "Admin account created.",
-    "adminCreationFailed": "Failed to create admin."
+    "adminCreationFailed": "Failed to create admin.",
+    "adminListTitle": "የአስተዳዳሪ መለያዎች",
+    "adminListHint": "ከAbel (123) ጋር ማስገባት ጊዜ ብቻ ይታያል።",
+    "adminListFailed": "የአስተዳዳሪ ዝርዝር መጫን አልተቻለም።"
   }
 };
 
@@ -289,6 +295,12 @@ class _PostsHomePageState extends State<PostsHomePage> {
   String? _error;
   String? _notificationStatus;
   AppLanguage _language = AppLanguage.en;
+  List<String> _adminUsernames = [];
+  bool _loadingAdminList = false;
+  String? _adminListError;
+
+  static const String _specialAdminUsername = "abel";
+  static const String _specialAdminPassword = "123";
 
   String _t(String key) {
     return _strings[_language]?[key] ?? key;
@@ -345,6 +357,60 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _fetchAdminList({VoidCallback? onDialogStateChanged}) async {
+    setState(() {
+      _loadingAdminList = true;
+      _adminListError = null;
+    });
+    onDialogStateChanged?.call();
+    List<String> usernames = [];
+    String? error;
+    try {
+      final response = await http.get(Uri.parse("$adminApiBaseUrl/api/admins"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to load admin list.");
+      }
+      final data = jsonDecode(response.body) as List<dynamic>;
+      usernames = data
+          .whereType<Map<String, dynamic>>()
+          .map((item) => item["username"]?.toString().trim() ?? "")
+          .where((value) => value.isNotEmpty)
+          .toList();
+    } catch (_) {
+      error = _t("adminListFailed");
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _adminUsernames = usernames;
+        _adminListError = error;
+        _loadingAdminList = false;
+      });
+      onDialogStateChanged?.call();
+    }
+  }
+
+  void _maybeLoadAdminListWhenNeeded({
+    required String username,
+    required String password,
+    VoidCallback? onDialogStateChanged,
+  }) {
+    if (!_shouldShowAdminList(username: username, password: password)) {
+      return;
+    }
+    if (_adminUsernames.isNotEmpty || _loadingAdminList) {
+      return;
+    }
+    _fetchAdminList(onDialogStateChanged: onDialogStateChanged);
+  }
+
+  bool _shouldShowAdminList({
+    required String username,
+    required String password,
+  }) {
+    return username.toLowerCase() == _specialAdminUsername &&
+        password == _specialAdminPassword;
   }
 
   Future<void> _saveLyric() async {
@@ -1047,34 +1113,99 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void _showAddAdminDialog() {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
+    bool dialogActive = true;
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(_t("addAdmin")),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: usernameController,
-                decoration: InputDecoration(labelText: _t("adminUsername")),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void handleCredentialChanged() {
+              setDialogState(() {});
+              _maybeLoadAdminListWhenNeeded(
+                username: usernameController.text.trim(),
+                password: passwordController.text.trim(),
+                onDialogStateChanged: () {
+                  if (!dialogActive) return;
+                  setDialogState(() {});
+                },
+              );
+            }
+
+            final currentUsername = usernameController.text.trim();
+            final currentPassword = passwordController.text.trim();
+            final showAdminList = _shouldShowAdminList(
+              username: currentUsername,
+              password: currentPassword,
+            );
+
+            return AlertDialog(
+              title: Text(_t("addAdmin")),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: usernameController,
+                    decoration: InputDecoration(labelText: _t("adminUsername")),
+                    onChanged: (_) => handleCredentialChanged(),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(labelText: _t("adminPassword")),
+                    onChanged: (_) => handleCredentialChanged(),
+                  ),
+                  if (showAdminList)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _t("adminListTitle"),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          if (_loadingAdminList)
+                            const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          else if (_adminListError != null)
+                            Text(
+                              _adminListError!,
+                              style: TextStyle(color: _brandCoral),
+                            )
+                          else if (_adminUsernames.isEmpty)
+                            Text(
+                              _t("adminListHint"),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            )
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: _adminUsernames
+                                  .map(
+                                    (admin) => Chip(label: Text(admin)),
+                                  )
+                                  .toList(),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(labelText: _t("adminPassword")),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(_t("cancel")),
-            ),
-            StatefulBuilder(
-              builder: (context, setDialogState) {
-                return ElevatedButton(
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(_t("cancel")),
+                ),
+                ElevatedButton(
                   onPressed: _addingAdmin
                       ? null
                       : () async {
@@ -1095,6 +1226,12 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           if (!mounted) return;
                           setDialogState(() {});
                           if (!success) return;
+                          if (showAdminList) {
+                            setState(() {
+                              _adminUsernames = [];
+                              _adminListError = null;
+                            });
+                          }
                           Navigator.pop(dialogContext);
                         },
                   child: _addingAdmin
@@ -1107,13 +1244,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           ),
                         )
                       : Text(_t("createAdmin")),
-                );
-              },
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         );
       },
     ).whenComplete(() {
+      dialogActive = false;
       usernameController.dispose();
       passwordController.dispose();
     });
@@ -1258,11 +1396,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
           _buildDrawerItem(
             icon: Icons.dashboard_outlined,
             label: _t("dashboard"),
-            onTap: () => Navigator.of(context).pop(),
-          ),
-          _buildDrawerItem(
-            icon: Icons.library_music_outlined,
-            label: _t("postsLibrary"),
             onTap: () => Navigator.of(context).pop(),
           ),
           _buildDrawerItem(
