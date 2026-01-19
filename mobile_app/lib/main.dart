@@ -29,10 +29,11 @@ class CarouselSlide {
   factory CarouselSlide.fromJson(Map<String, dynamic> json) {
     final imageUrl = json["imageUrl"]?.toString().trim() ?? "";
     final description = json["description"]?.toString() ?? "";
+    final isAsset = imageUrl.startsWith("assets/");
     return CarouselSlide(
       imageUrl: imageUrl,
       description: description,
-      isAsset: false,
+      isAsset: isAsset,
     );
   }
 }
@@ -139,29 +140,29 @@ Future<void> main() async {
 
 const List<CarouselSlide> _defaultCarouselSlides = [
   CarouselSlide(
-    imageUrl:
-        "https://images.unsplash.com/photo-1514986888952-8cd320577b7c?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "assets/images/carousel_1.png",
     description: "Worship every season",
+    isAsset: true,
   ),
   CarouselSlide(
-    imageUrl:
-        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "assets/images/carousel_2.png",
     description: "Let the words rise like incense",
+    isAsset: true,
   ),
   CarouselSlide(
-    imageUrl:
-        "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "assets/images/carousel_3.png",
     description: "Songs that carry your story",
+    isAsset: true,
   ),
   CarouselSlide(
-    imageUrl:
-        "https://images.unsplash.com/photo-1500048993953-6bc77b4e76c6?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "assets/images/carousel_4.png",
     description: "A melody for every dawn",
+    isAsset: true,
   ),
   CarouselSlide(
-    imageUrl:
-        "https://images.unsplash.com/photo-1529443606239-3af4f5f9f9c8?auto=format&fit=crop&w=1200&q=80",
+    imageUrl: "assets/images/carousel_5.png",
     description: "Lyrics rooted in grace",
+    isAsset: true,
   ),
 ];
 const String _fallbackCarouselDescription = "Worship every season";

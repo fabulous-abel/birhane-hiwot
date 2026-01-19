@@ -98,7 +98,8 @@ const ensureDefaultAdmin = async () => {
   defaultAdminEnsured = true;
 };
 
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions), (_req, res) => res.sendStatus(204));
+app.use(cors(corsOptions));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -111,7 +112,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(cors(corsOptions));
 app.use(express.json({ limit: "2mb" }));
 
 // Enhanced health check endpoint
