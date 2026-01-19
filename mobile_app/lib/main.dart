@@ -899,15 +899,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
             builder: (context, constraints) {
               final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
               final carouselWidth =
-                  math.min(maxCarouselWidth, 400).toDouble(); // reduce horizontal width
+                  math.min(maxCarouselWidth, 400).toDouble();
               return Center(
                 child: SizedBox(
                   width: carouselWidth,
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: Container(
-                      margin:
-                          const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
+                      margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16.0),
                         child: PageView.builder(
@@ -915,8 +914,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           controller: PageController(viewportFraction: 0.92),
                           itemBuilder: (context, index) {
                             return Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 6.0),
+                              margin: const EdgeInsets.symmetric(horizontal: 6.0),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16.0),
                                 boxShadow: [
@@ -936,8 +934,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                     Image.asset(
                                       _carouselAssetPaths[index],
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
+                                      errorBuilder: (context, error, stackTrace) {
                                         return Container(
                                           color: Colors.grey.shade300,
                                           child: const Center(
@@ -964,8 +961,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                     Align(
                                       alignment: Alignment.bottomLeft,
                                       child: Padding(
-                                        padding:
-                                            const EdgeInsets.all(16.0),
+                                        padding: const EdgeInsets.all(16.0),
                                         child: Text(
                                           'Worship every season',
                                           style: Theme.of(context)
@@ -983,6 +979,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                               ),
                             );
                           },
+                        ),
                       ),
                     ),
                   ),
@@ -1083,28 +1080,40 @@ class _PostsHomePageState extends State<PostsHomePage> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _navIndex,
-        selectedItemColor: const Color(0xFFE05E40),
-        onTap: _handleNavTap,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.notifications_none),
-            label: _t("notifications"),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.search),
-            label: _t("search"),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.favorite_border),
-            label: _t("favorites"),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            label: _t("profile"),
-          ),
-        ],
+      bottomNavigationBar: Material(
+        color: const Color(0xFF2F3E46),
+        elevation: 8,
+        child: BottomNavigationBar(
+          currentIndex: _navIndex,
+          selectedItemColor: const Color(0xFFE05E40),
+          unselectedItemColor: Colors.white70,
+          backgroundColor: Colors.transparent,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+          showUnselectedLabels: true,
+          onTap: _handleNavTap,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.notifications_none),
+              label: _t("notifications"),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.search),
+              label: _t("search"),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.favorite_border),
+              label: _t("favorites"),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.person_outline),
+              label: _t("profile"),
+            ),
+          ],
+        ),
       ),
     );
   }
