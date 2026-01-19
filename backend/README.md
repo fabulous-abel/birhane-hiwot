@@ -9,6 +9,10 @@ Express API that connects to MongoDB Atlas and exports an offline posts pack.
    - `npm install`
    - `npm run dev`
 
+# Vercel deployment
+
+The Express app is also mounted through `api/[[...slug]].js`, so a Vercel deployment can serve every `/api/*` route without an extra server process. When running locally, continue to use `npm run dev` (the Express server is still served by `server.js`).
+
 ## Endpoints
 
 - `GET /health`
