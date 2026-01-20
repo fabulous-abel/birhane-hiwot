@@ -10,9 +10,11 @@
         "flutter",
         "http",
         "share_plus",
+        "url_launcher",
         "webview_flutter"
       ],
       "devDependencies": [
+        "flutter_launcher_icons",
         "flutter_lints",
         "flutter_test"
       ]
@@ -50,6 +52,20 @@
         "webview_flutter_android",
         "webview_flutter_platform_interface",
         "webview_flutter_wkwebview"
+      ]
+    },
+    {
+      "name": "url_launcher",
+      "version": "6.3.2",
+      "dependencies": [
+        "flutter",
+        "url_launcher_android",
+        "url_launcher_ios",
+        "url_launcher_linux",
+        "url_launcher_macos",
+        "url_launcher_platform_interface",
+        "url_launcher_web",
+        "url_launcher_windows"
       ]
     },
     {
@@ -212,39 +228,6 @@
       ]
     },
     {
-      "name": "win32",
-      "version": "5.15.0",
-      "dependencies": [
-        "ffi"
-      ]
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "ffi",
-      "version": "2.1.5",
-      "dependencies": []
-    },
-    {
-      "name": "url_launcher_platform_interface",
-      "version": "2.3.2",
-      "dependencies": [
-        "flutter",
-        "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "url_launcher_linux",
-      "version": "3.2.2",
-      "dependencies": [
-        "flutter",
-        "url_launcher_platform_interface"
-      ]
-    },
-    {
       "name": "url_launcher_windows",
       "version": "3.1.5",
       "dependencies": [
@@ -261,6 +244,63 @@
         "url_launcher_platform_interface",
         "web"
       ]
+    },
+    {
+      "name": "url_launcher_platform_interface",
+      "version": "2.3.2",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_macos",
+      "version": "3.2.5",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_linux",
+      "version": "3.2.2",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_ios",
+      "version": "6.3.6",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "url_launcher_android",
+      "version": "6.3.28",
+      "dependencies": [
+        "flutter",
+        "url_launcher_platform_interface"
+      ]
+    },
+    {
+      "name": "win32",
+      "version": "5.15.0",
+      "dependencies": [
+        "ffi"
+      ]
+    },
+    {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "ffi",
+      "version": "2.1.5",
+      "dependencies": []
     },
     {
       "name": "file",
@@ -575,6 +615,92 @@
         "collection",
         "source_span",
         "string_scanner"
+      ]
+    },
+    {
+      "name": "flutter_launcher_icons",
+      "version": "0.13.1",
+      "dependencies": [
+        "args",
+        "checked_yaml",
+        "cli_util",
+        "image",
+        "json_annotation",
+        "path",
+        "yaml"
+      ]
+    },
+    {
+      "name": "json_annotation",
+      "version": "4.9.0",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "cli_util",
+      "version": "0.4.2",
+      "dependencies": [
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "checked_yaml",
+      "version": "2.0.4",
+      "dependencies": [
+        "json_annotation",
+        "source_span",
+        "yaml"
+      ]
+    },
+    {
+      "name": "args",
+      "version": "2.7.0",
+      "dependencies": []
+    },
+    {
+      "name": "image",
+      "version": "4.7.2",
+      "dependencies": [
+        "archive",
+        "meta",
+        "xml"
+      ]
+    },
+    {
+      "name": "archive",
+      "version": "4.0.7",
+      "dependencies": [
+        "crypto",
+        "path",
+        "posix"
+      ]
+    },
+    {
+      "name": "posix",
+      "version": "6.0.3",
+      "dependencies": [
+        "ffi",
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "xml",
+      "version": "6.6.1",
+      "dependencies": [
+        "collection",
+        "meta",
+        "petitparser"
+      ]
+    },
+    {
+      "name": "petitparser",
+      "version": "7.0.1",
+      "dependencies": [
+        "collection",
+        "meta"
       ]
     }
   ],

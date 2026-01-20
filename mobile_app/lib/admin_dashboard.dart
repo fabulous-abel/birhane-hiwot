@@ -36,6 +36,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "formHint": "Add rich metadata so the mobile app can filter packs offline.",
     "labelTitle": "Title",
     "labelTeacher": "Teacher",
+    "labelLink": "Link",
     "labelCategory": "Category",
     "labelSubcategory": "Subcategory (optional)",
     "labelArtist": "Artist",
@@ -88,7 +89,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminCreated": "Admin account created.",
     "adminCreationFailed": "Failed to create admin.",
     "adminListTitle": "Admin accounts",
-    "adminListHint": "Visible when adding Abel (123).",
+    "adminListHint": "No admin accounts yet.",
     "adminListFailed": "Failed to load admin list."
   },
   AppLanguage.am: {
@@ -110,6 +111,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "formHint": "ሞባይል መተግበሪያው ኦፍላይን እንዲያጣራ መረጃ ያክሉ።",
     "labelTitle": "ርዕስ",
     "labelTeacher": "አስተማሪ",
+    "labelLink": "Link",
     "labelCategory": "ምድብ",
     "labelSubcategory": "ንዑስ ምድብ (አማራጭ)",
     "labelArtist": "አርቲስት",
@@ -161,7 +163,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminCreated": "Admin account created.",
     "adminCreationFailed": "Failed to create admin.",
     "adminListTitle": "የአስተዳዳሪ መለያዎች",
-    "adminListHint": "ከAbel (123) ጋር ማስገባት ጊዜ ብቻ ይታያል።",
+    "adminListHint": "አሁን ምንም የአስተዳዳሪ መለያ የለም።",
     "adminListFailed": "የአስተዳዳሪ ዝርዝር መጫን አልተቻለም።"
   }
 };
@@ -275,6 +277,7 @@ class PostsHomePage extends StatefulWidget {
 class _PostsHomePageState extends State<PostsHomePage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _teacherController = TextEditingController();
+  final TextEditingController _linkController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _subCategoryController = TextEditingController();
 
@@ -299,9 +302,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
   bool _loadingAdminList = false;
   String? _adminListError;
 
-  static const String _specialAdminUsername = "abel";
-  static const String _specialAdminPassword = "123";
-
   String _t(String key) {
     return _strings[_language]?[key] ?? key;
   }
@@ -312,6 +312,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _loadLyrics();
     _fetchCategories();
     _fetchSubcategories();
+    _fetchAdminList();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {
@@ -325,6 +326,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void dispose() {
     _titleController.dispose();
     _teacherController.dispose();
+    _linkController.dispose();
     _categoryController.dispose();
     _subCategoryController.dispose();
 
@@ -359,12 +361,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
     }
   }
 
-  Future<void> _fetchAdminList({VoidCallback? onDialogStateChanged}) async {
+  Future<void> _fetchAdminList() async {
     setState(() {
       _loadingAdminList = true;
       _adminListError = null;
     });
-    onDialogStateChanged?.call();
     List<String> usernames = [];
     String? error;
     try {
@@ -380,37 +381,13 @@ class _PostsHomePageState extends State<PostsHomePage> {
           .toList();
     } catch (_) {
       error = _t("adminListFailed");
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _adminUsernames = usernames;
-        _adminListError = error;
-        _loadingAdminList = false;
-      });
-      onDialogStateChanged?.call();
     }
-  }
-
-  void _maybeLoadAdminListWhenNeeded({
-    required String username,
-    required String password,
-    VoidCallback? onDialogStateChanged,
-  }) {
-    if (!_shouldShowAdminList(username: username, password: password)) {
-      return;
-    }
-    if (_adminUsernames.isNotEmpty || _loadingAdminList) {
-      return;
-    }
-    _fetchAdminList(onDialogStateChanged: onDialogStateChanged);
-  }
-
-  bool _shouldShowAdminList({
-    required String username,
-    required String password,
-  }) {
-    return username.toLowerCase() == _specialAdminUsername &&
-        password == _specialAdminPassword;
+    if (!mounted) return;
+    setState(() {
+      _adminUsernames = usernames;
+      _adminListError = error;
+      _loadingAdminList = false;
+    });
   }
 
   Future<void> _saveLyric() async {
@@ -436,7 +413,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
       "teacher": _teacherController.text.trim(),
       "category": category,
       "subCategory": subCategory,
-      "body": body
+      "body": body,
+      "link": _linkController.text.trim(),
     };
 
     try {
@@ -1113,99 +1091,34 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void _showAddAdminDialog() {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
-    bool dialogActive = true;
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            void handleCredentialChanged() {
-              setDialogState(() {});
-              _maybeLoadAdminListWhenNeeded(
-                username: usernameController.text.trim(),
-                password: passwordController.text.trim(),
-                onDialogStateChanged: () {
-                  if (!dialogActive) return;
-                  setDialogState(() {});
-                },
-              );
-            }
-
-            final currentUsername = usernameController.text.trim();
-            final currentPassword = passwordController.text.trim();
-            final showAdminList = _shouldShowAdminList(
-              username: currentUsername,
-              password: currentPassword,
-            );
-
-            return AlertDialog(
-              title: Text(_t("addAdmin")),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: usernameController,
-                    decoration: InputDecoration(labelText: _t("adminUsername")),
-                    onChanged: (_) => handleCredentialChanged(),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: passwordController,
-                    obscureText: true,
-                    decoration: InputDecoration(labelText: _t("adminPassword")),
-                    onChanged: (_) => handleCredentialChanged(),
-                  ),
-                  if (showAdminList)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _t("adminListTitle"),
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          if (_loadingAdminList)
-                            const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          else if (_adminListError != null)
-                            Text(
-                              _adminListError!,
-                              style: TextStyle(color: _brandCoral),
-                            )
-                          else if (_adminUsernames.isEmpty)
-                            Text(
-                              _t("adminListHint"),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            )
-                          else
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: _adminUsernames
-                                  .map(
-                                    (admin) => Chip(label: Text(admin)),
-                                  )
-                                  .toList(),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
+        return AlertDialog(
+          title: Text(_t("addAdmin")),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameController,
+                decoration: InputDecoration(labelText: _t("adminUsername")),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(_t("cancel")),
-                ),
-                ElevatedButton(
+              const SizedBox(height: 10),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(labelText: _t("adminPassword")),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(_t("cancel")),
+            ),
+            StatefulBuilder(
+              builder: (context, setDialogState) {
+                return ElevatedButton(
                   onPressed: _addingAdmin
                       ? null
                       : () async {
@@ -1226,12 +1139,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           if (!mounted) return;
                           setDialogState(() {});
                           if (!success) return;
-                          if (showAdminList) {
-                            setState(() {
-                              _adminUsernames = [];
-                              _adminListError = null;
-                            });
-                          }
+                          await _fetchAdminList();
                           Navigator.pop(dialogContext);
                         },
                   child: _addingAdmin
@@ -1244,23 +1152,22 @@ class _PostsHomePageState extends State<PostsHomePage> {
                           ),
                         )
                       : Text(_t("createAdmin")),
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ],
         );
       },
     ).whenComplete(() {
-      dialogActive = false;
       usernameController.dispose();
       passwordController.dispose();
     });
   }
-
   void _clearForm() {
     _editingId = null;
     _titleController.clear();
     _teacherController.clear();
+    _linkController.clear();
     _categoryController.clear();
     _subCategoryController.clear();
 
@@ -1272,6 +1179,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _editingId = lyric.id;
     _titleController.text = lyric.title;
     _teacherController.text = lyric.teacher;
+    _linkController.text = lyric.link;
     _categoryController.text = lyric.category;
     _subCategoryController.text = lyric.subCategory;
 
@@ -1359,6 +1267,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   _buildFormCard(),
                   const SizedBox(height: 16),
                   _buildBroadcastCard(),
+                  const SizedBox(height: 16),
+                  _buildAdminAccountsCard(),
                   const SizedBox(height: 16),
                   _buildListCard(isEmbedded: true),
                 ],
@@ -1631,6 +1541,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
               decoration: InputDecoration(labelText: _t("labelTeacher")),
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _linkController,
+              decoration: InputDecoration(labelText: _t("labelLink")),
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: _categoryController.text.isEmpty
                   ? null
@@ -1843,6 +1758,60 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  Widget _buildAdminAccountsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  _t("adminListTitle"),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: _t("refresh"),
+                  onPressed: _fetchAdminList,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_loadingAdminList)
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_adminListError != null)
+              Text(
+                _adminListError!,
+                style: TextStyle(color: _brandCoral),
+              )
+            else if (_adminUsernames.isEmpty)
+              Text(
+                _t("adminListHint"),
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _adminUsernames
+                    .map((admin) => Chip(label: Text(admin)))
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildList({required bool isEmbedded}) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -1934,6 +1903,7 @@ class Lyric {
     required this.teacher,
     required this.category,
     required this.subCategory,
+    required this.link,
   });
 
   final String id;
@@ -1942,6 +1912,7 @@ class Lyric {
   final String teacher;
   final String category;
   final String subCategory;
+  final String link;
 
   factory Lyric.fromJson(Map<String, dynamic> json) {
     return Lyric(
@@ -1951,6 +1922,7 @@ class Lyric {
       teacher: json["teacher"]?.toString() ?? "",
       category: json["category"]?.toString() ?? "",
       subCategory: json["subCategory"]?.toString() ?? "",
+      link: json["link"]?.toString() ?? "",
     );
   }
 }

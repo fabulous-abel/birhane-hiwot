@@ -212,7 +212,7 @@ async function getPost(req, res) {
 async function createPost(req, res) {
   try {
     await ensureCollections();
-    const { title, teacher, category, subCategory, body, language, tags } =
+    const { title, teacher, category, subCategory, body, language, tags, link } =
       req.body || {};
     if (!title || !body) {
       return res.status(400).json({ error: "Title and body are required." });
@@ -223,6 +223,7 @@ async function createPost(req, res) {
       teacher: teacher || "",
       category: category || "",
       subCategory: subCategory || "",
+      link: link?.toString().trim() ?? "",
 
       body,
       language: language || "",
@@ -255,13 +256,14 @@ async function updatePost(req, res) {
     if (!ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: "Invalid post id." });
     }
-    const { title, teacher, category, subCategory, body, language, tags } =
+    const { title, teacher, category, subCategory, body, language, tags, link } =
       req.body || {};
     const update = {};
     if (title !== undefined) update.title = title;
     if (teacher !== undefined) update.teacher = teacher;
     if (category !== undefined) update.category = category;
     if (subCategory !== undefined) update.subCategory = subCategory;
+    if (link !== undefined) update.link = link?.toString().trim() ?? "";
 
     if (body !== undefined) update.body = body;
     if (language !== undefined) update.language = language;
@@ -519,6 +521,7 @@ async function exportPostsPack(_req, res) {
       teacher: post.teacher || "",
       category: post.category || "",
       subCategory: post.subCategory || "",
+      link: post.link || "",
 
       body: post.body,
       language: post.language || "",

@@ -5,12 +5,16 @@ import "dart:math" as math;
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:share_plus/share_plus.dart";
+import "package:url_launcher/url_launcher.dart";
 
 import "admin_dashboard.dart" as admin;
 
 enum AppLanguage { en, am }
 
 const String apiBaseUrl = "https://fabulous-abel-birhane-hiwot.vercel.app";
+
+final ValueNotifier<ThemeMode> _themeModeNotifier =
+    ValueNotifier(ThemeMode.light);
 
 // Store admin credentials
 bool isAdminLoggedIn = false;
@@ -41,7 +45,7 @@ class CarouselSlide {
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
     "appTitle": "Posts",
-    "appName": "Birhane Hiwot",
+    "appName": "ብርሃነ ሕይወት",
     "refresh": "Refresh",
     "noPosts": "No posts yet.",
     "untitled": "Untitled",
@@ -72,6 +76,8 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "favoriteAdded": "Added to favorites.",
     "favoriteRemoved": "Removed from favorites.",
     "share": "Share",
+    "play": "Play",
+    "teacherLink": "Open teacher link",
     "all": "All",
     "failedLoadPosts": "Failed to load posts. Check API connection.",
     "adminLogin": "Admin Login",
@@ -86,6 +92,9 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminPanelMsg": "You are logged in as admin. Access admin features here.",
     "settings": "Settings",
     "settingsSoon": "Settings options coming soon.",
+    "brightMode": "Bright",
+    "darkMode": "Dark",
+    "themeMode": "Theme mode",
   },
   AppLanguage.am: {
     "appTitle": "ፖስቶች",
@@ -121,6 +130,8 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "favoriteAdded": "ወደ ተወዳጅ ተጨምሯል።",
     "favoriteRemoved": "ከተወዳጅ ዝውውር ተሰርዟል።",
     "share": "አጋራ",
+    "play": "ይጫወቱ",
+    "teacherLink": "የመምህር አገናኝ ክፈት",
     "failedLoadPosts": "ፖስቶችን መጫን አልተሳካም።",
     "adminLogin": "የአስተዳዳሪ ግባ",
     "username": "የተጠቃሚ ስም",
@@ -134,6 +145,9 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminPanelMsg": "እርስዎ እንደ አስተዳዳሪ በገቡዋል። እዚህ የአስተዳዳሪ ተግባራትን ይድረሳሉ።",
     "settings": "ቅንብሮች",
     "settingsSoon": "ቅንብሮቹ በቅርብ ይመጣሉ።",
+    "brightMode": "Bright",
+    "darkMode": "Dark",
+    "themeMode": "Theme mode",
   }
 };
 
@@ -145,44 +159,58 @@ Future<void> main() async {
 const List<CarouselSlide> _defaultCarouselSlides = [
   CarouselSlide(
     imageUrl: "assets/images/carousel_1.png",
-    description: "Worship every season",
+    description: "ወደ ብርሃነ ህይወት ሰ/ት/ቤት መዝሙር ጥናት በሰላም መጡ።",
     isAsset: true,
   ),
   CarouselSlide(
     imageUrl: "assets/images/carousel_2.png",
-    description: "Let the words rise like incense",
+    description: "የተለያዩ መዝሙራቶችን በምድብ ተከፍለው እዚህ ያገኛሉ",
     isAsset: true,
   ),
   CarouselSlide(
     imageUrl: "assets/images/carousel_3.png",
-    description: "Songs that carry your story",
+    description: "",
     isAsset: true,
   ),
   CarouselSlide(
     imageUrl: "assets/images/carousel_4.png",
-    description: "A melody for every dawn",
+    description: "",
     isAsset: true,
   ),
   CarouselSlide(
     imageUrl: "assets/images/carousel_5.png",
-    description: "Lyrics rooted in grace",
+    description: "",
     isAsset: true,
   ),
 ];
 const String _fallbackCarouselDescription = "Worship every season";
+
+ThemeData _buildAppTheme(Brightness brightness) {
+  return ThemeData(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF2F3E46),
+      brightness: brightness,
+    ),
+    useMaterial3: true,
+  );
+}
 
 class PostsMobileApp extends StatelessWidget {
   const PostsMobileApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: "Posts",
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F3E46)),
-        useMaterial3: true,
-      ),
-      home: const PostsHomePage(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: _themeModeNotifier,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: "Posts",
+          theme: _buildAppTheme(Brightness.light),
+          darkTheme: _buildAppTheme(Brightness.dark),
+          themeMode: mode,
+          home: const PostsHomePage(),
+        );
+      },
     );
   }
 }
@@ -396,6 +424,53 @@ class _PostsHomePageState extends State<PostsHomePage> {
               child: Text(_t("close")),
             )
           ],
+        );
+      },
+    );
+  }
+
+  void _setDarkMode(bool enabled) {
+    _themeModeNotifier.value =
+        enabled ? ThemeMode.dark : ThemeMode.light;
+    setState(() {});
+  }
+
+  void _showThemeSettings() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t("themeMode"),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              ValueListenableBuilder<ThemeMode>(
+                valueListenable: _themeModeNotifier,
+                builder: (context, mode, _) {
+                  final isDark = mode == ThemeMode.dark;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_t("brightMode")),
+                      const SizedBox(width: 8),
+                      Switch.adaptive(
+                        value: isDark,
+                        onChanged: _setDarkMode,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_t("darkMode")),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -724,6 +799,49 @@ class _PostsHomePageState extends State<PostsHomePage> {
     }
   }
 
+  Future<void> _launchLink(String rawUrl) async {
+    Uri? uri;
+    try {
+      uri = Uri.parse(rawUrl);
+    } catch (_) {
+      return;
+    }
+    if (!uri.hasScheme) {
+      uri = Uri.parse("https://$rawUrl");
+    }
+    if (!await canLaunchUrl(uri)) {
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+  String? _extractPlayLink(Map<String, dynamic> post) {
+    return _extractLinkFromPost(post, [
+      "playLink",
+      "playUrl",
+      "audioUrl",
+      "youtubeUrl",
+      "link",
+      "url",
+    ]);
+  }
+
+  String? _extractTeacherLink(Map<String, dynamic> post) {
+    return _extractLinkFromPost(post, ["teacherLink", "teacherUrl"]);
+  }
+
+  String? _extractLinkFromPost(
+    Map<String, dynamic> post,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = post[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
   Widget _buildPostTile(
     Map<String, dynamic> post, {
     VoidCallback? onFavoriteToggled,
@@ -732,9 +850,47 @@ class _PostsHomePageState extends State<PostsHomePage> {
     final teacher = post["teacher"]?.toString().trim() ?? "";
     final category = post["category"]?.toString().trim() ?? "";
     final artist = post["artist"]?.toString().trim() ?? "";
-    final subtitle = [teacher, category, artist]
-        .where((value) => value.isNotEmpty)
-        .join(" - ");
+    final playLink = _extractPlayLink(post);
+    final teacherLink = _extractTeacherLink(post);
+    final metaParts = [
+      if (category.isNotEmpty) category,
+      if (artist.isNotEmpty) artist,
+    ];
+    final subtitleWidgets = <Widget>[];
+    if (teacher.isNotEmpty) {
+      subtitleWidgets.add(
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                teacher,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            if (teacherLink != null)
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.link, size: 18),
+                tooltip: _t("teacherLink"),
+                onPressed: () => _launchLink(teacherLink),
+              ),
+          ],
+        ),
+      );
+    }
+    if (metaParts.isNotEmpty) {
+      subtitleWidgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            metaParts.join(" - "),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -745,13 +901,24 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       child: ListTile(
         title: Text(title),
-        subtitle: subtitle.isEmpty ? null : Text(subtitle),
+        subtitle: subtitleWidgets.isEmpty
+            ? null
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: subtitleWidgets,
+              ),
         onTap: () => _showPost(post),
         trailing: SizedBox(
-          width: 96,
+          width: 150,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (playLink != null)
+                IconButton(
+                  icon: const Icon(Icons.play_circle_fill),
+                  tooltip: _t("play"),
+                  onPressed: () => _launchLink(playLink),
+                ),
               IconButton(
                 icon: Icon(
                   _isFavorite(post) ? Icons.favorite : Icons.favorite_border,
@@ -893,11 +1060,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _showFavoritesSheet();
       return;
     }
-    if (index == 3) {
-      _showDrawerMessage(_t("settings"), _t("settingsSoon"));
-      return;
-    }
-    _showDrawerMessage(_t("profile"), _t("profileSoon"));
+      if (index == 3) {
+        _showThemeSettings();
+        return;
+      }
+      _showDrawerMessage(_t("profile"), _t("profileSoon"));
   }
 
   String _extractErrorMessage(http.Response response, String fallback) {
@@ -1011,7 +1178,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
             const CircleAvatar(
               radius: 14,
               backgroundColor: Color(0xFF2F3E46),
-              child: Icon(Icons.music_note, color: Colors.white, size: 16),
+              backgroundImage:
+                  AssetImage("assets/images/carousel_5.png"),
             ),
             const SizedBox(width: 10),
             Text(
@@ -1290,6 +1458,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 const CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.white,
+                  backgroundImage:
+                      AssetImage("assets/images/carousel_5.png"),
                   child: Icon(Icons.person, color: Color(0xFF2F3E46)),
                 ),
                 const SizedBox(height: 12),
