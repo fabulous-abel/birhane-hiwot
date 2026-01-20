@@ -183,7 +183,7 @@ const List<CarouselSlide> _defaultCarouselSlides = [
     isAsset: true,
   ),
 ];
-const String _fallbackCarouselDescription = "Worship every season";
+const String _fallbackCarouselDescription = "ብርሃነ ሕይወት";
 
 ThemeData _buildAppTheme(Brightness brightness) {
   return ThemeData(
@@ -430,8 +430,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   }
 
   void _setDarkMode(bool enabled) {
-    _themeModeNotifier.value =
-        enabled ? ThemeMode.dark : ThemeMode.light;
+    _themeModeNotifier.value = enabled ? ThemeMode.dark : ThemeMode.light;
     setState(() {});
   }
 
@@ -814,6 +813,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
     }
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
+
   String? _extractPlayLink(Map<String, dynamic> post) {
     return _extractLinkFromPost(post, [
       "playLink",
@@ -1060,11 +1060,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _showFavoritesSheet();
       return;
     }
-      if (index == 3) {
-        _showThemeSettings();
-        return;
-      }
-      _showDrawerMessage(_t("profile"), _t("profileSoon"));
+    if (index == 3) {
+      _showThemeSettings();
+      return;
+    }
+    _showDrawerMessage(_t("profile"), _t("profileSoon"));
   }
 
   String _extractErrorMessage(http.Response response, String fallback) {
@@ -1178,8 +1178,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
             const CircleAvatar(
               radius: 14,
               backgroundColor: Color(0xFF2F3E46),
-              backgroundImage:
-                  AssetImage("assets/images/carousel_5.png"),
+              backgroundImage: AssetImage("assets/images/carousel_5.png"),
             ),
             const SizedBox(width: 10),
             Text(
@@ -1458,8 +1457,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 const CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.white,
-                  backgroundImage:
-                      AssetImage("assets/images/carousel_5.png"),
+                  backgroundImage: AssetImage("assets/images/carousel_5.png"),
                   child: Icon(Icons.person, color: Color(0xFF2F3E46)),
                 ),
                 const SizedBox(height: 12),
