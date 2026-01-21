@@ -9,7 +9,7 @@ dotenv.config();
 const app = express();
 const uri = process.env.MONGODB_URI;
 const DEFAULT_ADMIN_USERNAME = process.env.DEFAULT_ADMIN_USERNAME ?? "Abel";
-const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? "123";
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? "abeldjfab";
 const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE ?? "super";
 const ADMIN_SALT_ROUNDS =
   Number.parseInt(process.env.ADMIN_SALT_ROUNDS ?? "10", 10) || 10;
