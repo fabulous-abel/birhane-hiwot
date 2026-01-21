@@ -229,6 +229,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   List<CarouselSlide> _carouselSlides = _defaultCarouselSlides;
   bool _loading = false;
   bool _loadingNotifications = false;
+  DateTime? _notificationsLastSeenAt;
   bool _adminLoginInProgress = false;
   static const int _recentPostsLimit = 6;
   String? _error;
@@ -247,6 +248,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   @override
   void initState() {
     super.initState();
+    _notificationsLastSeenAt = DateTime.now();
     _fetchPosts();
     _fetchNotifications();
     _fetchCarouselSlides();
@@ -309,6 +311,23 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _loadingNotifications = false;
       });
     }
+  }
+
+  int get _unseenNotificationCount {
+    final lastSeen = _notificationsLastSeenAt;
+    if (lastSeen == null) return 0;
+    return _notifications
+        .where((notification) {
+          final createdAt = _notificationCreatedAt(notification);
+          return createdAt != null && createdAt.isAfter(lastSeen);
+        })
+        .length;
+  }
+
+  DateTime? _notificationCreatedAt(Map<String, dynamic> notification) {
+    final value = notification["createdAt"]?.toString();
+    if (value == null || value.isEmpty) return null;
+    return DateTime.tryParse(value);
   }
 
   Future<void> _fetchCarouselSlides() async {
@@ -1046,6 +1065,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void _handleNavTap(int index) {
     setState(() {
       _navIndex = index;
+      if (index == 0) {
+        _notificationsLastSeenAt = DateTime.now();
+      }
     });
     if (index == 0) {
       _fetchNotifications();
@@ -1418,11 +1440,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
               const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
           showUnselectedLabels: true,
           onTap: _handleNavTap,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.notifications_none),
-              label: _t("notifications"),
-            ),
+            items: [
+              BottomNavigationBarItem(
+                icon: _buildNotificationNavIcon(),
+                label: _t("notifications"),
+              ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.search),
               label: _t("search"),
@@ -1438,6 +1460,38 @@ class _PostsHomePageState extends State<PostsHomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNotificationNavIcon() {
+    final unseenCount = _unseenNotificationCount;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.notifications_none),
+        if (unseenCount > 0)
+          Positioned(
+            right: -4,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                unseenCount > 99 ? "99+" : unseenCount.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

@@ -59,6 +59,12 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "notificationRequired": "Notification message is required.",
     "send": "Send",
     "sending": "Sending...",
+    "broadcastListTitle": "Broadcast history",
+    "broadcastListHint": "No broadcast messages yet.",
+    "deleteBroadcast": "Delete broadcast",
+    "broadcastDeletePrompt": "Delete this broadcast message?",
+    "broadcastDeleted": "Broadcast deleted.",
+    "broadcastDeleteFailed": "Failed to delete broadcast.",
     "categoriesDialogTitle": "Categories",
     "subcategoriesDialogTitle": "Subcategories",
     "addCategory": "Add category",
@@ -90,7 +96,14 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminCreationFailed": "Failed to create admin.",
     "adminListTitle": "Admin accounts",
     "adminListHint": "No admin accounts yet.",
-    "adminListFailed": "Failed to load admin list."
+    "adminListFailed": "Failed to load admin list.",
+    "adminPasswordHidden": "Password hidden.",
+    "defaultAdminLabel": "Default admin",
+    "deleteAdmin": "Delete admin",
+    "deleteAdminPrompt": "Delete admin account",
+    "adminDeleted": "Admin deleted.",
+    "adminDeleteFailed": "Failed to delete admin.",
+    "adminCreatedLabel": "Created"
   },
   AppLanguage.am: {
     "appTitle": "የጽሑፍ አስተዳዳሪ",
@@ -133,6 +146,12 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "notificationRequired": "የማስታወቂያ መልዕክት ያስፈልጋል።",
     "send": "ላክ",
     "sending": "በመላክ ላይ...",
+    "broadcastListTitle": "?????? ????",
+    "broadcastListHint": "???? ??????? ???? ?????",
+    "deleteBroadcast": "?????? ??????",
+    "broadcastDeletePrompt": "?????? ?????? ???? ??????",
+    "broadcastDeleted": "?????? ????",
+    "broadcastDeleteFailed": "?????? ???? ???????",
     "categoriesDialogTitle": "ምድቦች",
     "subcategoriesDialogTitle": "ንዑስ ምድቦች",
     "addCategory": "ምድብ ጨምር",
@@ -164,7 +183,14 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "adminCreationFailed": "Failed to create admin.",
     "adminListTitle": "የአስተዳዳሪ መለያዎች",
     "adminListHint": "አሁን ምንም የአስተዳዳሪ መለያ የለም።",
-    "adminListFailed": "የአስተዳዳሪ ዝርዝር መጫን አልተቻለም።"
+    "adminListFailed": "የአስተዳዳሪ ዝርዝር መጫን አልተቻለም።",
+    "adminPasswordHidden": "Password hidden.",
+    "defaultAdminLabel": "Default admin",
+    "deleteAdmin": "Delete admin",
+    "deleteAdminPrompt": "Delete admin account",
+    "adminDeleted": "Admin deleted.",
+    "adminDeleteFailed": "Failed to delete admin.",
+    "adminCreatedLabel": "Created"
   }
 };
 
@@ -291,6 +317,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
   bool _loading = false;
   bool _heroVisible = false;
   bool _sendingNotification = false;
+  List<Map<String, dynamic>> _broadcastMessages = [];
+  bool _loadingBroadcastMessages = false;
+  String? _broadcastError;
   bool _loadingCategories = false;
   bool _loadingSubcategories = false;
   bool _addingAdmin = false;
@@ -298,7 +327,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   String? _error;
   String? _notificationStatus;
   AppLanguage _language = AppLanguage.en;
-  List<String> _adminUsernames = [];
+  List<AdminAccount> _adminAccounts = [];
   bool _loadingAdminList = false;
   String? _adminListError;
 
@@ -310,8 +339,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void initState() {
     super.initState();
     _loadLyrics();
-    _fetchCategories();
-    _fetchSubcategories();
+   _fetchCategories();
+   _fetchSubcategories();
+    _fetchBroadcastMessages();
     _fetchAdminList();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -366,7 +396,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _loadingAdminList = true;
       _adminListError = null;
     });
-    List<String> usernames = [];
+    List<AdminAccount> accounts = [];
     String? error;
     try {
       final response = await http.get(Uri.parse("$adminApiBaseUrl/api/admins"));
@@ -374,17 +404,17 @@ class _PostsHomePageState extends State<PostsHomePage> {
         throw Exception("Failed to load admin list.");
       }
       final data = jsonDecode(response.body) as List<dynamic>;
-      usernames = data
+      accounts = data
           .whereType<Map<String, dynamic>>()
-          .map((item) => item["username"]?.toString().trim() ?? "")
-          .where((value) => value.isNotEmpty)
+          .map((item) => AdminAccount.fromJson(item))
+          .where((account) => account.username.isNotEmpty)
           .toList();
     } catch (_) {
       error = _t("adminListFailed");
     }
     if (!mounted) return;
     setState(() {
-      _adminUsernames = usernames;
+      _adminAccounts = accounts;
       _adminListError = error;
       _loadingAdminList = false;
     });
@@ -457,6 +487,63 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _error = _t("failedDeletePost");
       });
     }
+  }
+
+  Future<void> _confirmDeleteAdmin(AdminAccount admin) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t("deleteAdmin")),
+        content: Text("${_t("deleteAdminPrompt")} ${admin.username}?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(_t("cancel")),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(_t("deleteAdmin")),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _deleteAdmin(admin.username);
+    }
+  }
+
+  Future<void> _deleteAdmin(String username) async {
+    try {
+      final uri = Uri.parse(
+        "$adminApiBaseUrl/api/admins/${Uri.encodeComponent(username)}",
+      );
+      final response = await http.delete(uri);
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to delete admin.");
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("adminDeleted"))),
+      );
+      await _fetchAdminList();
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("adminDeleteFailed"))),
+      );
+    }
+  }
+
+  String? _formatAdminCreatedAt(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    return parsed
+        .toLocal()
+        .toIso8601String()
+        .replaceFirst("T", " ")
+        .split(".")
+        .first;
   }
 
   Future<void> _fetchCategories() async {
@@ -670,6 +757,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       setState(() {
         _notificationStatus = _t("notificationSent");
       });
+      await _fetchBroadcastMessages();
     } catch (err) {
       setState(() {
         _notificationStatus = _t("notificationFailed");
@@ -678,6 +766,83 @@ class _PostsHomePageState extends State<PostsHomePage> {
       setState(() {
         _sendingNotification = false;
       });
+    }
+  }
+
+  Future<void> _fetchBroadcastMessages() async {
+    setState(() {
+      _loadingBroadcastMessages = true;
+      _broadcastError = null;
+    });
+    try {
+      final response =
+          await http.get(Uri.parse("$adminApiBaseUrl/api/notifications"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to load broadcast messages.");
+      }
+      final data = jsonDecode(response.body) as List<dynamic>;
+      setState(() {
+        _broadcastMessages = data
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        _broadcastError = null;
+      });
+    } catch (err) {
+      setState(() {
+        _broadcastMessages = [];
+        _broadcastError = _t("broadcastListHint");
+      });
+    } finally {
+      setState(() {
+        _loadingBroadcastMessages = false;
+      });
+    }
+  }
+
+  Future<void> _confirmDeleteBroadcast(Map<String, dynamic> broadcast) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_t("deleteBroadcast")),
+        content: Text(_t("broadcastDeletePrompt")),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(_t("cancel")),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(_t("deleteBroadcast")),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      final id = broadcast["_id"]?.toString();
+      if (id != null && id.isNotEmpty) {
+        await _deleteBroadcast(id);
+      }
+    }
+  }
+
+  Future<void> _deleteBroadcast(String id) async {
+    try {
+      final response =
+          await http.delete(Uri.parse("$adminApiBaseUrl/api/notifications/$id"));
+      if (response.statusCode >= 400) {
+        throw Exception("Failed to delete broadcast.");
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("broadcastDeleted"))),
+      );
+      await _fetchBroadcastMessages();
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("broadcastDeleteFailed"))),
+      );
     }
   }
 
@@ -1240,12 +1405,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Column(
-                              children: [
-                                _buildFormCard(),
-                                const SizedBox(height: 16),
-                                _buildBroadcastCard(),
-                              ],
+                        child: Column(
+                          children: [
+                            _buildFormCard(),
+                            const SizedBox(height: 16),
+                            _buildBroadcastCard(),
+                            const SizedBox(height: 16),
+                            _buildBroadcastHistoryCard(),
+                          ],
                             ),
                           ),
                           const SizedBox(width: 24),
@@ -1267,6 +1434,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   _buildFormCard(),
                   const SizedBox(height: 16),
                   _buildBroadcastCard(),
+                  const SizedBox(height: 16),
+                  _buildBroadcastHistoryCard(),
                   const SizedBox(height: 16),
                   _buildAdminAccountsCard(),
                   const SizedBox(height: 16),
@@ -1758,6 +1927,89 @@ class _PostsHomePageState extends State<PostsHomePage> {
     );
   }
 
+  Widget _buildBroadcastHistoryCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  _t("broadcastListTitle"),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: _t("refresh"),
+                  onPressed: _fetchBroadcastMessages,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_loadingBroadcastMessages)
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_broadcastError != null)
+              Text(
+                _broadcastError!,
+                style: TextStyle(color: _brandCoral),
+              )
+            else if (_broadcastMessages.isEmpty)
+              Text(
+                _t("broadcastListHint"),
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              Column(
+                children: _broadcastMessages
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) {
+                        final broadcast = entry.value;
+                        final createdAt =
+                            _formatAdminCreatedAt(broadcast["createdAt"]?.toString());
+                        final isLast =
+                            entry.key == _broadcastMessages.length - 1;
+                        return Column(
+                          children: [
+                            ListTile(
+                              title: Text(
+                                broadcast["message"]?.toString() ?? "",
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: createdAt == null
+                                  ? null
+                                  : Text(createdAt),
+                              trailing: IconButton(
+                                tooltip: _t("deleteBroadcast"),
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () =>
+                                    _confirmDeleteBroadcast(broadcast),
+                              ),
+                            ),
+                            if (!isLast) const Divider(height: 0),
+                          ],
+                        );
+                      },
+                    )
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdminAccountsCard() {
     return Card(
       child: Padding(
@@ -1793,17 +2045,63 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 _adminListError!,
                 style: TextStyle(color: _brandCoral),
               )
-            else if (_adminUsernames.isEmpty)
+            else if (_adminAccounts.isEmpty)
               Text(
                 _t("adminListHint"),
                 style: Theme.of(context).textTheme.bodySmall,
               )
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: _adminUsernames
-                    .map((admin) => Chip(label: Text(admin)))
+              Column(
+                children: _adminAccounts
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) {
+                        final admin = entry.value;
+                        final isLast = entry.key == _adminAccounts.length - 1;
+                        final passwordText =
+                            admin.passwordHint?.isNotEmpty == true
+                                ? "${_t("adminPassword")}: ${admin.passwordHint}"
+                                : _t("adminPasswordHidden");
+                        final createdAt = _formatAdminCreatedAt(admin.createdAt);
+                        return Column(
+                          children: [
+                            ListTile(
+                              title: Row(
+                                children: [
+                                  Text(admin.username),
+                                  if (admin.isDefault)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 8),
+                                      child: Chip(
+                                        label: Text(_t("defaultAdminLabel")),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(passwordText),
+                                  if (createdAt != null)
+                                    Text("${_t("adminCreatedLabel")}: $createdAt"),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                tooltip: _t("deleteAdmin"),
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: admin.isDefault
+                                    ? null
+                                    : () => _confirmDeleteAdmin(admin),
+                              ),
+                            ),
+                            if (!isLast) const Divider(height: 0),
+                          ],
+                        );
+                      },
+                    )
                     .toList(),
               ),
           ],
@@ -1891,6 +2189,30 @@ class _PostsHomePageState extends State<PostsHomePage> {
           onPressed: () => _deleteLyric(lyric.id),
         ),
       ),
+    );
+  }
+}
+
+class AdminAccount {
+  final String username;
+  final String? createdAt;
+  final bool isDefault;
+  final String? passwordHint;
+
+  AdminAccount({
+    required this.username,
+    this.createdAt,
+    this.isDefault = false,
+    this.passwordHint,
+  });
+
+  factory AdminAccount.fromJson(Map<String, dynamic> data) {
+    final username = data["username"]?.toString().trim() ?? "";
+    return AdminAccount(
+      username: username,
+      createdAt: data["createdAt"]?.toString(),
+      isDefault: data["isDefault"] == true,
+      passwordHint: data["password"]?.toString(),
     );
   }
 }

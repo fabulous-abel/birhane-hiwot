@@ -497,14 +497,42 @@ async function listAdmins(_req, res) {
       .sort({ createdAt: -1 })
       .toArray();
     res.json(
-      admins.map((admin) => ({
-        username: admin.username,
-        createdAt: admin.createdAt ? admin.createdAt.toISOString() : null
-      }))
+      admins.map((admin) => {
+        const isDefault = admin.username === DEFAULT_ADMIN_USERNAME;
+        return {
+          username: admin.username,
+          createdAt: admin.createdAt ? admin.createdAt.toISOString() : null,
+          isDefault,
+          password: isDefault ? DEFAULT_ADMIN_PASSWORD : null
+        };
+      })
     );
   } catch (err) {
     console.error("listAdmins error", err);
     res.status(500).json({ error: "Failed to load admins." });
+  }
+}
+
+async function deleteAdmin(req, res) {
+  try {
+    await ensureCollections();
+    const username = req.params.username?.toString().trim();
+    if (!username) {
+      return res.status(400).json({ error: "Username is required." });
+    }
+    if (username === DEFAULT_ADMIN_USERNAME) {
+      return res
+        .status(403)
+        .json({ error: "Default admin cannot be deleted." });
+    }
+    const result = await adminsCollection.deleteOne({ username });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Admin not found." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("deleteAdmin error", err);
+    res.status(500).json({ error: "Failed to delete admin." });
   }
 }
 
@@ -561,7 +589,15 @@ app.get("/api/notifications", async (_req, res) => {
       .find()
       .sort({ createdAt: -1 })
       .toArray();
-    res.json(notifications);
+    res.json(
+      notifications.map((notification) => ({
+        _id: notification._id?.toString(),
+        message: notification.message,
+        createdAt: notification.createdAt
+          ? notification.createdAt.toISOString()
+          : null
+      }))
+    );
   } catch (err) {
     res.status(500).json({ error: "Failed to load notifications." });
   }
@@ -579,9 +615,33 @@ app.post("/api/notifications", async (req, res) => {
       createdAt: new Date()
     };
     const result = await notificationsCollection.insertOne(notification);
-    res.status(201).json({ ...notification, _id: result.insertedId });
+    res.status(201).json({
+      _id: result.insertedId?.toString(),
+      message,
+      createdAt: notification.createdAt.toISOString()
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to create notification." });
+  }
+});
+
+app.delete("/api/notifications/:id", async (req, res) => {
+  try {
+    await ensureCollections();
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid notification id." });
+    }
+    const result = await notificationsCollection.deleteOne({
+      _id: new ObjectId(id)
+    });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Notification not found." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("deleteNotification error", err);
+    res.status(500).json({ error: "Failed to delete notification." });
   }
 });
 
@@ -750,6 +810,7 @@ app.delete("/api/subcategories/:id", async (req, res) => {
 app.post("/api/admins", createAdmin);
 app.post("/api/admins/login", loginAdmin);
 app.get("/api/admins", listAdmins);
+app.delete("/api/admins/:username", deleteAdmin);
 
 export { ensureCollections };
 export default app;
