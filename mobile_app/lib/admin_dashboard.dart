@@ -18,6 +18,7 @@ enum AppLanguage { en, am }
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
     "appTitle": "Posts Admin",
+    "importPdf": "Import PDF",
     "dashboard": "Dashboard",
     "postsLibrary": "Posts Library",
     "postsControl": "Posts Control",
@@ -106,6 +107,7 @@ const Map<AppLanguage, Map<String, String>> _strings = {
   },
   AppLanguage.am: {
     "appTitle": "የጽሑፍ አስተዳዳሪ",
+    "importPdf": "PDF አስገባ",
     "dashboard": "ዳሽቦርድ",
     "postsLibrary": "የፖስቶች ቤተ-መዝገብ",
     "postsControl": "የፖስቶች አስተዳደር",
@@ -882,6 +884,25 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          final controller =
+                                              TextEditingController(text: name);
+                                          final updated =
+                                              await showDialog<String>(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                title: Text(_t("addCategory")),
+                                                content: TextField(
+                                                  controller: controller,
+                                                  decoration: InputDecoration(
+                                                    labelText:
+                                                        _t("labelCategory"),
+                                                  ),
+                                                ),
+                                                actions: [
                                                   TextButton(
                                                     onPressed: () =>
                                                         Navigator.pop(context),
@@ -912,6 +933,25 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                           );
                                         },
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () {
+                                          final id =
+                                              category["_id"]?.toString() ?? "";
+                                          if (id.isEmpty) return;
+                                          _deleteCategory(id);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(_t("close")),
@@ -997,6 +1037,26 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          final controller =
+                                              TextEditingController(text: name);
+                                          final updated =
+                                              await showDialog<String>(
+                                            context: context,
+                                            builder: (context) {
+                                              return AlertDialog(
+                                                title:
+                                                    Text(_t("addSubcategory")),
+                                                content: TextField(
+                                                  controller: controller,
+                                                  decoration: InputDecoration(
+                                                    labelText:
+                                                        _t("labelSubcategory"),
+                                                  ),
+                                                ),
+                                                actions: [
                                                   TextButton(
                                                     onPressed: () =>
                                                         Navigator.pop(context),
@@ -1036,6 +1096,36 @@ class _PostsHomePageState extends State<PostsHomePage> {
                                           );
                                         },
                                       ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () {
+                                          final id =
+                                              subcategory["_id"]?.toString() ??
+                                                  "";
+                                          final categoryId =
+                                              subcategory["categoryId"]
+                                                      ?.toString() ??
+                                                  "";
+                                          if (id.isEmpty ||
+                                              categoryId.isEmpty) {
+                                            return;
+                                          }
+                                          _deleteSubcategory(
+                                            id: id,
+                                            categoryId: categoryId,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(_t("close")),
@@ -1061,6 +1151,67 @@ class _PostsHomePageState extends State<PostsHomePage> {
       },
     );
     nameController.dispose();
+  }
+
+  Future<void> _importPdf() async {
+    if (_categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("addCategoryFirst"))),
+      );
+      return;
+    }
+    String? selectedCategory = _categories.first["name"]?.toString();
+    final category = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(_t("selectCategory")),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return DropdownButtonFormField<String>(
+                value: selectedCategory,
+                items: _categories
+                    .map((category) => category["name"]?.toString() ?? "")
+                    .where((name) => name.isNotEmpty)
+                    .map(
+                      (name) => DropdownMenuItem(
+                        value: name,
+                        child: Text(name),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedCategory = value;
+                  });
+                },
+                decoration: InputDecoration(labelText: _t("labelCategory")),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(_t("cancel")),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, selectedCategory?.trim());
+              },
+              child: Text(_t("continue")),
+            ),
+          ],
+        );
+      },
+    );
+    if (category == null || category.isEmpty) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("PDF import is only available on the web admin."),
+      ),
+    );
   }
 
   Future<bool> _createAdminAccount({
@@ -1208,6 +1359,11 @@ class _PostsHomePageState extends State<PostsHomePage> {
       appBar: AppBar(
         title: Text(_t("appTitle")),
         actions: [
+          IconButton(
+            tooltip: _t("importPdf"),
+            onPressed: _importPdf,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+          ),
           TextButton(
             onPressed: () {
               setState(() {
@@ -1785,3 +1941,310 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const Spacer(),
+                IconButton(
+                  tooltip: _t("refresh"),
+                  onPressed: _fetchBroadcastMessages,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_loadingBroadcastMessages)
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_broadcastError != null)
+              Text(
+                _broadcastError!,
+                style: TextStyle(color: _brandCoral),
+              )
+            else if (_broadcastMessages.isEmpty)
+              Text(
+                _t("broadcastListHint"),
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              Column(
+                children: _broadcastMessages
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) {
+                        final broadcast = entry.value;
+                        final createdAt =
+                            _formatAdminCreatedAt(broadcast["createdAt"]?.toString());
+                        final isLast =
+                            entry.key == _broadcastMessages.length - 1;
+                        return Column(
+                          children: [
+                            ListTile(
+                              title: Text(
+                                broadcast["message"]?.toString() ?? "",
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: createdAt == null
+                                  ? null
+                                  : Text(createdAt),
+                              trailing: IconButton(
+                                tooltip: _t("deleteBroadcast"),
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () =>
+                                    _confirmDeleteBroadcast(broadcast),
+                              ),
+                            ),
+                            if (!isLast) const Divider(height: 0),
+                          ],
+                        );
+                      },
+                    )
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminAccountsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  _t("adminListTitle"),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: _t("refresh"),
+                  onPressed: _fetchAdminList,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (_loadingAdminList)
+              const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else if (_adminListError != null)
+              Text(
+                _adminListError!,
+                style: TextStyle(color: _brandCoral),
+              )
+            else if (_adminAccounts.isEmpty)
+              Text(
+                _t("adminListHint"),
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              Column(
+                children: _adminAccounts
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) {
+                        final admin = entry.value;
+                        final isLast = entry.key == _adminAccounts.length - 1;
+                        final passwordText =
+                            admin.passwordHint?.isNotEmpty == true
+                                ? "${_t("adminPassword")}: ${admin.passwordHint}"
+                                : _t("adminPasswordHidden");
+                        final createdAt = _formatAdminCreatedAt(admin.createdAt);
+                        return Column(
+                          children: [
+                            ListTile(
+                              title: Row(
+                                children: [
+                                  Text(admin.username),
+                                  if (admin.isDefault)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 8),
+                                      child: Chip(
+                                        label: Text(_t("defaultAdminLabel")),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(passwordText),
+                                  if (createdAt != null)
+                                    Text("${_t("adminCreatedLabel")}: $createdAt"),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                tooltip: _t("deleteAdmin"),
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: admin.isDefault
+                                    ? null
+                                    : () => _confirmDeleteAdmin(admin),
+                              ),
+                            ),
+                            if (!isLast) const Divider(height: 0),
+                          ],
+                        );
+                      },
+                    )
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList({required bool isEmbedded}) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_lyrics.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _t("noPosts"),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: _brandInk.withOpacity(0.6)),
+          ),
+        ),
+      );
+    }
+
+    if (isEmbedded) {
+      return Column(
+        children: _lyrics
+            .map(
+              (lyric) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildLyricTile(lyric),
+              ),
+            )
+            .toList(),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _lyrics.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final lyric = _lyrics[index];
+        return _buildLyricTile(lyric);
+      },
+    );
+  }
+
+  String _parseErrorMessage(http.Response response, String fallback) {
+    if (response.body.isEmpty) {
+      return fallback;
+    }
+    try {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic>) {
+        final message = data["error"] ?? data["message"];
+        if (message is String && message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  Widget _buildLyricTile(Lyric lyric) {
+    final subtitle = [lyric.teacher, lyric.category, lyric.subCategory]
+        .where((value) => value.isNotEmpty)
+        .join(" - ");
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _brandClay),
+      ),
+      child: ListTile(
+        title: Text(lyric.title),
+        subtitle: subtitle.isEmpty ? null : Text(subtitle),
+        onTap: () => _startEdit(lyric),
+        trailing: IconButton(
+          tooltip: "Delete",
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () => _deleteLyric(lyric.id),
+        ),
+      ),
+    );
+  }
+}
+
+class AdminAccount {
+  final String username;
+  final String? createdAt;
+  final bool isDefault;
+  final String? passwordHint;
+
+  AdminAccount({
+    required this.username,
+    this.createdAt,
+    this.isDefault = false,
+    this.passwordHint,
+  });
+
+  factory AdminAccount.fromJson(Map<String, dynamic> data) {
+    final username = data["username"]?.toString().trim() ?? "";
+    return AdminAccount(
+      username: username,
+      createdAt: data["createdAt"]?.toString(),
+      isDefault: data["isDefault"] == true,
+      passwordHint: data["password"]?.toString(),
+    );
+  }
+}
+
+class Lyric {
+  Lyric({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.teacher,
+    required this.category,
+    required this.subCategory,
+    required this.link,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final String teacher;
+  final String category;
+  final String subCategory;
+  final String link;
+
+  factory Lyric.fromJson(Map<String, dynamic> json) {
+    return Lyric(
+      id: json["_id"]?.toString() ?? json["id"]?.toString() ?? "",
+      title: json["title"]?.toString() ?? "",
+      body: json["body"]?.toString() ?? "",
+      teacher: json["teacher"]?.toString() ?? "",
+      category: json["category"]?.toString() ?? "",
+      subCategory: json["subCategory"]?.toString() ?? "",
+      link: json["link"]?.toString() ?? "",
+    );
+  }
+}
