@@ -13,6 +13,11 @@ const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD ?? "abeldjfab"
 const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE ?? "super";
 const ADMIN_SALT_ROUNDS =
   Number.parseInt(process.env.ADMIN_SALT_ROUNDS ?? "10", 10) || 10;
+const SERVER_SELECTION_TIMEOUT_MS =
+  Number.parseInt(
+    process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS ?? "15000",
+    10
+  ) || 15000;
 const corsOptions = {
   origin: (origin, callback) => callback(null, true),
   credentials: true,
@@ -23,7 +28,9 @@ if (!uri) {
   throw new Error("MONGODB_URI is required.");
 }
 
-const client = new MongoClient(uri);
+const client = new MongoClient(uri, {
+  serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS
+});
 let postsCollection;
 let notificationsCollection;
 let categoriesCollection;
@@ -41,29 +48,46 @@ const ensureCollections = async () => {
 
   if (!initPromise) {
     initPromise = (async () => {
-      await client.connect();
-      const dbFromUri = new URL(uri).pathname?.replace("/", "");
-      const dbName = process.env.DB_NAME || dbFromUri || "lyrics";
-      const db = client.db(dbName);
-      postsCollection = db.collection(
-        process.env.COLLECTION_NAME || "lyrics"
-      );
-      notificationsCollection = db.collection(
-        process.env.NOTIFICATIONS_COLLECTION || "notifications"
-      );
-      categoriesCollection = db.collection(
-        process.env.CATEGORIES_COLLECTION || "categories"
-      );
-      subcategoriesCollection = db.collection(
-        process.env.SUBCATEGORIES_COLLECTION || "subcategories"
-      );
-      adminsCollection = db.collection(
-        process.env.ADMINS_COLLECTION || "admins"
-      );
-      carouselCollection = db.collection(
-        process.env.CAROUSEL_COLLECTION || "carousel"
-      );
-      collectionsInitialized = true;
+      try {
+        await client.connect();
+        const dbFromUri = new URL(uri).pathname?.replace("/", "");
+        const dbName = process.env.DB_NAME || dbFromUri || "lyrics";
+        const db = client.db(dbName);
+        postsCollection = db.collection(
+          process.env.COLLECTION_NAME || "lyrics"
+        );
+        notificationsCollection = db.collection(
+          process.env.NOTIFICATIONS_COLLECTION || "notifications"
+        );
+        categoriesCollection = db.collection(
+          process.env.CATEGORIES_COLLECTION || "categories"
+        );
+        subcategoriesCollection = db.collection(
+          process.env.SUBCATEGORIES_COLLECTION || "subcategories"
+        );
+        adminsCollection = db.collection(
+          process.env.ADMINS_COLLECTION || "admins"
+        );
+        carouselCollection = db.collection(
+          process.env.CAROUSEL_COLLECTION || "carousel"
+        );
+        collectionsInitialized = true;
+      } catch (error) {
+        initPromise = undefined;
+        collectionsInitialized = false;
+        postsCollection = undefined;
+        notificationsCollection = undefined;
+        categoriesCollection = undefined;
+        subcategoriesCollection = undefined;
+        adminsCollection = undefined;
+        carouselCollection = undefined;
+        try {
+          await client.close();
+        } catch {
+          // Ignore cleanup failures and surface the original connection error.
+        }
+        throw error;
+      }
     })();
   }
 
