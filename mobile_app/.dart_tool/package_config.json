@@ -189,7 +189,7 @@
     },
     {
       "name": "mime",
-      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/mime-2.0.0",
+      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/mime-1.0.6",
       "packageUri": "lib/",
       "languageVersion": "3.2"
     },
@@ -261,13 +261,13 @@
     },
     {
       "name": "share_plus",
-      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus-12.0.1",
+      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus-7.2.2",
       "packageUri": "lib/",
-      "languageVersion": "3.4"
+      "languageVersion": "2.18"
     },
     {
       "name": "share_plus_platform_interface",
-      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus_platform_interface-6.1.0",
+      "rootUri": "file:///C:/Users/ETHIOPIA/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus_platform_interface-3.4.0",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
@@ -446,7 +446,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2026-04-17T20:34:06.574744Z",
+  "generated": "2026-04-18T18:20:51.609158Z",
   "generator": "pub",
   "generatorVersion": "3.4.4",
   "flutterRoot": "file:///C:/src/flutter",

@@ -239,12 +239,12 @@ class PostsAdminApp extends StatelessWidget {
           ),
           iconTheme: IconThemeData(color: _brandInk),
         ),
-        cardTheme: CardThemeData(
+        cardTheme: const CardTheme(
           color: Colors.white,
           elevation: 4,
-          shadowColor: const Color(0x1418232B),
+          shadowColor: Color(0x1418232B),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.all(Radius.circular(20)),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
@@ -339,8 +339,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
   void initState() {
     super.initState();
     _loadLyrics();
-   _fetchCategories();
-   _fetchSubcategories();
+    _fetchCategories();
+    _fetchSubcategories();
     _fetchBroadcastMessages();
     _fetchAdminList();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -551,7 +551,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
       _loadingCategories = true;
     });
     try {
-      final response = await http.get(Uri.parse("$adminApiBaseUrl/api/categories"));
+      final response =
+          await http.get(Uri.parse("$adminApiBaseUrl/api/categories"));
       if (response.statusCode >= 400) {
         throw Exception("Failed to load categories.");
       }
@@ -578,7 +579,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
     try {
       final uri = categoryId == null || categoryId.isEmpty
           ? Uri.parse("$adminApiBaseUrl/api/subcategories")
-          : Uri.parse("$adminApiBaseUrl/api/subcategories?categoryId=$categoryId");
+          : Uri.parse(
+              "$adminApiBaseUrl/api/subcategories?categoryId=$categoryId");
       final response = await http.get(uri);
       if (response.statusCode >= 400) {
         throw Exception("Failed to load subcategories.");
@@ -647,8 +649,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
     required String categoryId,
   }) async {
     try {
-      final response =
-          await http.delete(Uri.parse("$adminApiBaseUrl/api/subcategories/$id"));
+      final response = await http
+          .delete(Uri.parse("$adminApiBaseUrl/api/subcategories/$id"));
       if (response.statusCode >= 400) {
         throw Exception("Failed to delete subcategory.");
       }
@@ -828,8 +830,8 @@ class _PostsHomePageState extends State<PostsHomePage> {
 
   Future<void> _deleteBroadcast(String id) async {
     try {
-      final response =
-          await http.delete(Uri.parse("$adminApiBaseUrl/api/notifications/$id"));
+      final response = await http
+          .delete(Uri.parse("$adminApiBaseUrl/api/notifications/$id"));
       if (response.statusCode >= 400) {
         throw Exception("Failed to delete broadcast.");
       }
@@ -1228,8 +1230,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
         body: jsonEncode({"username": username, "password": password}),
       );
       if (response.statusCode >= 400) {
-        final message =
-            _parseErrorMessage(response, _t("adminCreationFailed"));
+        final message = _parseErrorMessage(response, _t("adminCreationFailed"));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -1328,6 +1329,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       passwordController.dispose();
     });
   }
+
   void _clearForm() {
     _editingId = null;
     _titleController.clear();
@@ -1405,14 +1407,14 @@ class _PostsHomePageState extends State<PostsHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                        child: Column(
-                          children: [
-                            _buildFormCard(),
-                            const SizedBox(height: 16),
-                            _buildBroadcastCard(),
-                            const SizedBox(height: 16),
-                            _buildBroadcastHistoryCard(),
-                          ],
+                            child: Column(
+                              children: [
+                                _buildFormCard(),
+                                const SizedBox(height: 16),
+                                _buildBroadcastCard(),
+                                const SizedBox(height: 16),
+                                _buildBroadcastHistoryCard(),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 24),
@@ -1969,40 +1971,32 @@ class _PostsHomePageState extends State<PostsHomePage> {
               )
             else
               Column(
-                children: _broadcastMessages
-                    .asMap()
-                    .entries
-                    .map(
-                      (entry) {
-                        final broadcast = entry.value;
-                        final createdAt =
-                            _formatAdminCreatedAt(broadcast["createdAt"]?.toString());
-                        final isLast =
-                            entry.key == _broadcastMessages.length - 1;
-                        return Column(
-                          children: [
-                            ListTile(
-                              title: Text(
-                                broadcast["message"]?.toString() ?? "",
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: createdAt == null
-                                  ? null
-                                  : Text(createdAt),
-                              trailing: IconButton(
-                                tooltip: _t("deleteBroadcast"),
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () =>
-                                    _confirmDeleteBroadcast(broadcast),
-                              ),
-                            ),
-                            if (!isLast) const Divider(height: 0),
-                          ],
-                        );
-                      },
-                    )
-                    .toList(),
+                children: _broadcastMessages.asMap().entries.map(
+                  (entry) {
+                    final broadcast = entry.value;
+                    final createdAt = _formatAdminCreatedAt(
+                        broadcast["createdAt"]?.toString());
+                    final isLast = entry.key == _broadcastMessages.length - 1;
+                    return Column(
+                      children: [
+                        ListTile(
+                          title: Text(
+                            broadcast["message"]?.toString() ?? "",
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: createdAt == null ? null : Text(createdAt),
+                          trailing: IconButton(
+                            tooltip: _t("deleteBroadcast"),
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _confirmDeleteBroadcast(broadcast),
+                          ),
+                        ),
+                        if (!isLast) const Divider(height: 0),
+                      ],
+                    );
+                  },
+                ).toList(),
               ),
           ],
         ),
@@ -2052,57 +2046,52 @@ class _PostsHomePageState extends State<PostsHomePage> {
               )
             else
               Column(
-                children: _adminAccounts
-                    .asMap()
-                    .entries
-                    .map(
-                      (entry) {
-                        final admin = entry.value;
-                        final isLast = entry.key == _adminAccounts.length - 1;
-                        final passwordText =
-                            admin.passwordHint?.isNotEmpty == true
-                                ? "${_t("adminPassword")}: ${admin.passwordHint}"
-                                : _t("adminPasswordHidden");
-                        final createdAt = _formatAdminCreatedAt(admin.createdAt);
-                        return Column(
-                          children: [
-                            ListTile(
-                              title: Row(
-                                children: [
-                                  Text(admin.username),
-                                  if (admin.isDefault)
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8),
-                                      child: Chip(
-                                        label: Text(_t("defaultAdminLabel")),
-                                        visualDensity: VisualDensity.compact,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(passwordText),
-                                  if (createdAt != null)
-                                    Text("${_t("adminCreatedLabel")}: $createdAt"),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                tooltip: _t("deleteAdmin"),
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: admin.isDefault
-                                    ? null
-                                    : () => _confirmDeleteAdmin(admin),
-                              ),
-                            ),
-                            if (!isLast) const Divider(height: 0),
-                          ],
-                        );
-                      },
-                    )
-                    .toList(),
+                children: _adminAccounts.asMap().entries.map(
+                  (entry) {
+                    final admin = entry.value;
+                    final isLast = entry.key == _adminAccounts.length - 1;
+                    final passwordText = admin.passwordHint?.isNotEmpty == true
+                        ? "${_t("adminPassword")}: ${admin.passwordHint}"
+                        : _t("adminPasswordHidden");
+                    final createdAt = _formatAdminCreatedAt(admin.createdAt);
+                    return Column(
+                      children: [
+                        ListTile(
+                          title: Row(
+                            children: [
+                              Text(admin.username),
+                              if (admin.isDefault)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Chip(
+                                    label: Text(_t("defaultAdminLabel")),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(passwordText),
+                              if (createdAt != null)
+                                Text("${_t("adminCreatedLabel")}: $createdAt"),
+                            ],
+                          ),
+                          trailing: IconButton(
+                            tooltip: _t("deleteAdmin"),
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: admin.isDefault
+                                ? null
+                                : () => _confirmDeleteAdmin(admin),
+                          ),
+                        ),
+                        if (!isLast) const Divider(height: 0),
+                      ],
+                    );
+                  },
+                ).toList(),
               ),
           ],
         ),
