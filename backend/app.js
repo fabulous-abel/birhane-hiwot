@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { MongoClient, ObjectId } from "mongodb";
 
 dotenv.config();
+dotenv.config({ path: "backend/.env" });
 
 const app = express();
 const uri = process.env.MONGODB_URI;
