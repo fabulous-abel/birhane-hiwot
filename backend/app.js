@@ -31,13 +31,10 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-if (!uri) {
-  throw new Error("MONGODB_URI is required.");
-}
+// Defer the MONGODB_URI check to the first request (ensureCollections)
+// instead of throwing at module-load time, which crashes Vercel serverless functions.
 
-const client = new MongoClient(uri, {
-  serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS
-});
+let client;
 let postsCollection;
 let notificationsCollection;
 let categoriesCollection;
@@ -292,6 +289,16 @@ const ensureCollections = async () => {
   if (!initPromise) {
     initPromise = (async () => {
       try {
+        if (!uri) {
+          throw new Error(
+            "MONGODB_URI is required. Set it in your Vercel environment variables."
+          );
+        }
+        if (!client) {
+          client = new MongoClient(uri, {
+            serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS
+          });
+        }
         await client.connect();
         const dbFromUri = new URL(uri).pathname?.replace("/", "");
         const dbName = process.env.DB_NAME || dbFromUri || "lyrics";

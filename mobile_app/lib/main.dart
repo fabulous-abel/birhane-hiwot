@@ -1,3 +1,4 @@
+import "dart:async";
 import "dart:convert";
 
 import "dart:math" as math;
@@ -5,6 +6,7 @@ import "dart:math" as math;
 import "package:flutter/material.dart";
 import "package:http/http.dart" as http;
 import "package:share_plus/share_plus.dart";
+import "package:shimmer/shimmer.dart";
 import "package:url_launcher/url_launcher.dart";
 
 import "admin_dashboard.dart" as admin;
@@ -45,7 +47,7 @@ class CarouselSlide {
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
     "appTitle": "Posts",
-    "appName": "ብርሃነ ሕይወት",
+    "appName": "ብርሃነ ህይወት",
     "refresh": "Refresh",
     "noPosts": "No posts yet.",
     "untitled": "Untitled",
@@ -204,7 +206,7 @@ class PostsMobileApp extends StatelessWidget {
       valueListenable: _themeModeNotifier,
       builder: (context, mode, _) {
         return MaterialApp(
-          title: "Posts",
+          title: "ብርሃነ ህይወት",
           theme: _buildAppTheme(Brightness.light),
           darkTheme: _buildAppTheme(Brightness.dark),
           themeMode: mode,
@@ -232,6 +234,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
   DateTime? _notificationsLastSeenAt;
   bool _adminLoginInProgress = false;
   static const int _recentPostsLimit = 6;
+  final PageController _carouselController = PageController(viewportFraction: 0.92);
+  Timer? _carouselTimer;
+  int _currentCarouselPage = 0;
+  bool _carouselSlidesLoading = true;
   String? _error;
   String _selectedCategory = _strings[AppLanguage.am]?["all"] ?? "All";
   String _searchCategory = _strings[AppLanguage.am]?["all"] ?? "All";
@@ -252,10 +258,28 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _fetchPosts();
     _fetchNotifications();
     _fetchCarouselSlides();
+    _startCarouselAutoPlay();
+  }
+
+  void _startCarouselAutoPlay() {
+    _carouselTimer?.cancel();
+    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      final slides = _carouselSlides.isEmpty ? _defaultCarouselSlides : _carouselSlides;
+      if (slides.isEmpty) return;
+      final nextPage = (_currentCarouselPage + 1) % slides.length;
+      _carouselController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutCubic,
+      );
+    });
   }
 
   @override
   void dispose() {
+    _carouselTimer?.cancel();
+    _carouselController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -331,6 +355,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   }
 
   Future<void> _fetchCarouselSlides() async {
+    setState(() { _carouselSlidesLoading = true; });
     try {
       final response = await http.get(Uri.parse("$apiBaseUrl/api/carousel"));
       if (response.statusCode >= 400) {
@@ -344,10 +369,12 @@ class _PostsHomePageState extends State<PostsHomePage> {
           .toList();
       setState(() {
         _carouselSlides = slides.isNotEmpty ? slides : _defaultCarouselSlides;
+        _carouselSlidesLoading = false;
       });
     } catch (_) {
       setState(() {
         _carouselSlides = _defaultCarouselSlides;
+        _carouselSlidesLoading = false;
       });
     }
   }
@@ -365,12 +392,10 @@ class _PostsHomePageState extends State<PostsHomePage> {
       fit: BoxFit.cover,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
-        return const Center(
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+        return Shimmer.fromColors(
+          baseColor: Colors.grey.shade300,
+          highlightColor: Colors.grey.shade100,
+          child: Container(color: Colors.grey.shade300),
         );
       },
       errorBuilder: _buildCarouselImageError,
@@ -864,6 +889,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   Widget _buildPostTile(
     Map<String, dynamic> post, {
     VoidCallback? onFavoriteToggled,
+    int index = 0,
   }) {
     final title = post["title"]?.toString() ?? _t("untitled");
     final teacher = post["teacher"]?.toString().trim() ?? "";
@@ -883,7 +909,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
             Expanded(
               child: Text(
                 teacher,
-                style: Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             if (teacherLink != null)
@@ -891,7 +919,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.link, size: 18),
+                icon: Icon(Icons.link, size: 18, color: Theme.of(context).colorScheme.primary),
                 tooltip: _t("teacherLink"),
                 onPressed: () => _launchLink(teacherLink),
               ),
@@ -903,56 +931,126 @@ class _PostsHomePageState extends State<PostsHomePage> {
       subtitleWidgets.add(
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            metaParts.join(" - "),
-            style: Theme.of(context).textTheme.bodySmall,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              metaParts.join(" • "),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       );
     }
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.3),
+    return _AnimatedPostCard(
+      index: index,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).shadowColor.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      child: ListTile(
-        title: Text(title),
-        subtitle: subtitleWidgets.isEmpty
-            ? null
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: subtitleWidgets,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _showPost(post),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                          Theme.of(context).colorScheme.tertiary.withOpacity(0.15),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        title.isNotEmpty ? title[0] : "?",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (subtitleWidgets.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          ...subtitleWidgets,
+                        ],
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (playLink != null)
+                        IconButton(
+                          icon: Icon(Icons.play_circle_fill,
+                            color: Theme.of(context).colorScheme.primary),
+                          tooltip: _t("play"),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _launchLink(playLink),
+                        ),
+                      IconButton(
+                        icon: Icon(
+                          _isFavorite(post) ? Icons.favorite : Icons.favorite_border,
+                          color: _isFavorite(post) ? const Color(0xFFE05E40) : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        tooltip: _t("favorites"),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _toggleFavorite(post, onUpdated: onFavoriteToggled),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.share_outlined,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        tooltip: _t("share"),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _sharePost(post),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-        onTap: () => _showPost(post),
-        trailing: SizedBox(
-          width: 150,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (playLink != null)
-                IconButton(
-                  icon: const Icon(Icons.play_circle_fill),
-                  tooltip: _t("play"),
-                  onPressed: () => _launchLink(playLink),
-                ),
-              IconButton(
-                icon: Icon(
-                  _isFavorite(post) ? Icons.favorite : Icons.favorite_border,
-                  color: _isFavorite(post) ? Colors.red : null,
-                ),
-                tooltip: _t("favorites"),
-                onPressed: () =>
-                    _toggleFavorite(post, onUpdated: onFavoriteToggled),
-              ),
-              IconButton(
-                icon: const Icon(Icons.share_outlined),
-                tooltip: _t("share"),
-                onPressed: () => _sharePost(post),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1184,6 +1282,198 @@ class _PostsHomePageState extends State<PostsHomePage> {
     return sorted.sublist(0, _recentPostsLimit);
   }
 
+  Widget _buildCarouselSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        height: 185,
+      ),
+    );
+  }
+
+  Widget _buildPostSkeletonList() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 5,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 14, width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 10, width: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 24, height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCarouselWithDots(List<CarouselSlide> slides) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 185,
+          child: PageView.builder(
+            itemCount: slides.length,
+            controller: _carouselController,
+            onPageChanged: (index) {
+              setState(() { _currentCarouselPage = index; });
+            },
+            itemBuilder: (context, index) {
+              final slide = slides[index];
+              return AnimatedBuilder(
+                animation: _carouselController,
+                builder: (context, child) {
+                  double value = 1.0;
+                  if (_carouselController.position.haveDimensions) {
+                    value = (_carouselController.page ?? 0) - index;
+                    value = (1 - (value.abs() * 0.25)).clamp(0.0, 1.0);
+                  }
+                  return Center(
+                    child: Transform.scale(
+                      scale: Curves.easeOut.transform(value),
+                      child: Opacity(
+                        opacity: Curves.easeOut.transform(value),
+                        child: child,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        spreadRadius: 1,
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18.0),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildCarouselImage(slide),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.65),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.bottomLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              slide.description.isNotEmpty
+                                  ? slide.description
+                                  : _fallbackCarouselDescription,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      const Shadow(blurRadius: 8, color: Colors.black54),
+                                    ],
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(slides.length, (index) {
+            final isActive = index == _currentCarouselPage;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isActive ? 24 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                color: isActive ? const Color(0xFFE05E40) : Colors.grey.shade400,
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final postsToShow = _searchFilteredPosts;
@@ -1191,28 +1481,41 @@ class _PostsHomePageState extends State<PostsHomePage> {
         _searchQuery.isEmpty && _searchCategory == _t("all");
     final displayPosts =
         isShowingDefaultList ? _recentPostsFrom(postsToShow) : postsToShow;
+    final slides = _carouselSlides.isEmpty ? _defaultCarouselSlides : _carouselSlides;
     return Scaffold(
       drawer: _buildDrawer(),
       appBar: AppBar(
         toolbarHeight: 52,
         title: Row(
           children: [
-            const CircleAvatar(
-              radius: 14,
-              backgroundColor: Color(0xFF2F3E46),
-              backgroundImage: AssetImage("assets/images/carousel_5.png"),
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE05E40), width: 2),
+              ),
+              child: const CircleAvatar(
+                radius: 14,
+                backgroundColor: Color(0xFF2F3E46),
+                backgroundImage: AssetImage("assets/images/carousel_5.png"),
+              ),
             ),
             const SizedBox(width: 10),
             Text(
               _t("appName"),
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
             tooltip: _t("refresh"),
-            onPressed: _fetchPosts,
+            onPressed: () {
+              _fetchPosts();
+              _fetchCarouselSlides();
+              _fetchNotifications();
+            },
             icon: const Icon(Icons.refresh),
           ),
           TextButton(
@@ -1233,163 +1536,74 @@ class _PostsHomePageState extends State<PostsHomePage> {
       ),
       body: Column(
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final slides = _carouselSlides.isEmpty
-                  ? _defaultCarouselSlides
-                  : _carouselSlides;
-              final maxCarouselWidth = math.max(0, constraints.maxWidth - 32);
-              const double targetCarouselWidth = 340;
-              final carouselWidth =
-                  math.min(maxCarouselWidth, targetCarouselWidth).toDouble();
-              return Center(
-                child: SizedBox(
-                  width: carouselWidth,
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Container(
-                      margin: const EdgeInsets.fromLTRB(10.0, 5.0, 10.0, 5.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16.0),
-                        child: PageView.builder(
-                          itemCount: slides.length,
-                          controller: PageController(viewportFraction: 0.92),
-                          itemBuilder: (context, index) {
-                            final slide = slides[index];
-                            return Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 6.0),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16.0),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    spreadRadius: 2,
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16.0),
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    _buildCarouselImage(slide),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            Colors.black.withOpacity(0.65),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.bottomLeft,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Text(
-                                          slide.description.isNotEmpty
-                                              ? slide.description
-                                              : _fallbackCarouselDescription,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+          _carouselSlidesLoading
+              ? _buildCarouselSkeleton()
+              : _buildCarouselWithDots(slides),
+          const SizedBox(height: 4),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.red),
-              ),
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
             ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _t("search"),
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: _t("searchHint"),
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        onChanged: (value) {
+                          setState(() { _searchQuery = value; });
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              labelText: _t("searchHint"),
-                              prefixIcon: const Icon(Icons.search),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = value;
-                              });
-                            },
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 3,
+                      child: SizedBox(
+                        height: 40,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _categories.map((category) {
+                              final isSelected = category == _searchCategory;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: Text(category, style: const TextStyle(fontSize: 12)),
+                                  selected: isSelected,
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _searchCategory = category;
+                                      _selectedCategory = category;
+                                      _searchQuery = "";
+                                      _searchController.clear();
+                                    });
+                                  },
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: SizedBox(
-                            height: 40,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: _categories.map((category) {
-                                  final isSelected =
-                                      category == _searchCategory;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(category),
-                                      selected: isSelected,
-                                      onSelected: (_) {
-                                        setState(() {
-                                          _searchCategory = category;
-                                          _selectedCategory = category;
-                                          _searchQuery = "";
-                                          _searchController.clear();
-                                        });
-                                      },
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -1398,28 +1612,29 @@ class _PostsHomePageState extends State<PostsHomePage> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? _buildPostSkeletonList()
                 : displayPosts.isEmpty
                     ? Center(
-                        child: Text(_t("noPosts")),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.article_outlined, size: 48,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4)),
+                            const SizedBox(height: 8),
+                            Text(_t("noPosts"),
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
                       )
                     : RefreshIndicator(
                         onRefresh: _fetchPosts,
-                        child: Column(
-                          children: [
-                            const Divider(height: 1),
-                            Expanded(
-                              child: ListView.separated(
-                                controller: _scrollController,
-                                itemCount: displayPosts.length,
-                                separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
-                                itemBuilder: (context, index) {
-                                  return _buildPostTile(displayPosts[index]);
-                                },
-                              ),
-                            ),
-                          ],
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.only(top: 4, bottom: 8),
+                          itemCount: displayPosts.length,
+                          itemBuilder: (context, index) {
+                            return _buildPostTile(displayPosts[index], index: index);
+                          },
                         ),
                       ),
           ),
@@ -1434,17 +1649,15 @@ class _PostsHomePageState extends State<PostsHomePage> {
           unselectedItemColor: Colors.white70,
           backgroundColor: Colors.transparent,
           type: BottomNavigationBarType.fixed,
-          selectedLabelStyle:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-          unselectedLabelStyle:
-              const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
           showUnselectedLabels: true,
           onTap: _handleNavTap,
-            items: [
-              BottomNavigationBarItem(
-                icon: _buildNotificationNavIcon(),
-                label: _t("notifications"),
-              ),
+          items: [
+            BottomNavigationBarItem(
+              icon: _buildNotificationNavIcon(),
+              label: _t("notifications"),
+            ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.search),
               label: _t("search"),
@@ -1593,6 +1806,80 @@ class _PostsHomePageState extends State<PostsHomePage> {
       context,
       MaterialPageRoute(
         builder: (context) => const admin.PostsAdminApp(),
+      ),
+    );
+  }
+}
+
+class _AnimatedPostCard extends StatefulWidget {
+  final Widget child;
+  final int index;
+
+  const _AnimatedPostCard({
+    required this.child,
+    this.index = 0,
+  });
+
+  @override
+  State<_AnimatedPostCard> createState() => _AnimatedPostCardState();
+}
+
+class _AnimatedPostCardState extends State<_AnimatedPostCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+  double _scale = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+    Future.delayed(
+      Duration(milliseconds: 80 * widget.index),
+      () {
+        if (mounted) _controller.forward();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _scale = 0.97),
+          onTapUp: (_) => setState(() => _scale = 1.0),
+          onTapCancel: () => setState(() => _scale = 1.0),
+          child: AnimatedScale(
+            scale: _scale,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            child: widget.child,
+          ),
+        ),
       ),
     );
   }

@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/[[...slug]]"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/[[...slug]]"
+    },
+    {
+      "source": "/health-details",
+      "destination": "/api/[[...slug]]"
+    }
+  ],
+  "functions": {
+    "api/[[...slug]].js": {
+      "maxDuration": 30
+    }
+  }
+}
