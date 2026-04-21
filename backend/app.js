@@ -3,7 +3,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import tls from "tls";
 import { MongoClient, ObjectId } from "mongodb";
+
+// Fix TLS handshake with MongoDB Atlas on Node v24+ (OpenSSL 3.5)
+tls.DEFAULT_MIN_VERSION = "TLSv1.2";
 
 dotenv.config();
 dotenv.config({ path: "backend/.env" });
@@ -296,7 +300,10 @@ const ensureCollections = async () => {
         }
         if (!client) {
           client = new MongoClient(uri, {
-            serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS
+            serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
+            tls: true,
+            tlsAllowInvalidCertificates: false,
+            minPoolSize: 0,
           });
         }
         await client.connect();
