@@ -8,6 +8,7 @@ import { MongoClient, ObjectId } from "mongodb";
 
 // Fix TLS handshake with MongoDB Atlas on Node v24+ (OpenSSL 3.5)
 tls.DEFAULT_MIN_VERSION = "TLSv1.2";
+tls.DEFAULT_MAX_VERSION = "TLSv1.2";
 
 dotenv.config();
 dotenv.config({ path: "backend/.env" });
