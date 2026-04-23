@@ -296,9 +296,23 @@ class _PostsHomePageState extends State<PostsHomePage> {
         throw Exception("Failed to load posts.");
       }
       final data = jsonDecode(response.body) as List<dynamic>;
+      final posts =
+          data.map((item) => Map<String, dynamic>.from(item as Map)).toList()
+            ..sort((a, b) {
+              final categoryA =
+                  a["category"]?.toString().toLowerCase().trim() ?? "";
+              final categoryB =
+                  b["category"]?.toString().toLowerCase().trim() ?? "";
+              final categoryComparison = categoryA.compareTo(categoryB);
+              if (categoryComparison != 0) {
+                return categoryComparison;
+              }
+              final titleA = a["title"]?.toString().toLowerCase().trim() ?? "";
+              final titleB = b["title"]?.toString().toLowerCase().trim() ?? "";
+              return titleA.compareTo(titleB);
+            });
       setState(() {
-        _posts =
-            data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+        _posts = posts;
       });
     } catch (err) {
       setState(() {
@@ -1150,14 +1164,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
       return true;
     }
     final postCategory = post["category"]?.toString() ?? "";
-    if (postCategory == category) {
-      return true;
-    }
-    final rawTags = post["tags"];
-    if (rawTags is List) {
-      return rawTags.map((tag) => tag.toString()).contains(category);
-    }
-    return false;
+    return postCategory == category;
   }
 
   void _handleNavTap(int index) {
@@ -1208,13 +1215,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     for (final post in _posts) {
       final category = post["category"]?.toString().trim() ?? "";
       if (category.isNotEmpty) categories.add(category);
-      final rawTags = post["tags"];
-      if (rawTags is List) {
-        for (final tag in rawTags) {
-          final value = tag.toString().trim();
-          if (value.isNotEmpty) categories.add(value);
-        }
-      }
     }
     final list = categories.toList()..sort();
     return [_t("all"), ...list];
@@ -1224,17 +1224,9 @@ class _PostsHomePageState extends State<PostsHomePage> {
     if (_selectedCategory == _t("all")) {
       return _posts;
     }
-    return _posts.where((post) {
-      final category = post["category"]?.toString() ?? "";
-      if (category == _selectedCategory) {
-        return true;
-      }
-      final rawTags = post["tags"];
-      if (rawTags is List) {
-        return rawTags.map((tag) => tag.toString()).contains(_selectedCategory);
-      }
-      return false;
-    }).toList();
+    return _posts
+        .where((post) => post["category"]?.toString() == _selectedCategory)
+        .toList();
   }
 
   List<Map<String, dynamic>> get _searchFilteredPosts {

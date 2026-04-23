@@ -305,7 +305,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
   final TextEditingController _teacherController = TextEditingController();
   final TextEditingController _linkController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _subCategoryController = TextEditingController();
 
   final TextEditingController _bodyController = TextEditingController();
   final TextEditingController _notificationController = TextEditingController();
@@ -358,7 +357,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _teacherController.dispose();
     _linkController.dispose();
     _categoryController.dispose();
-    _subCategoryController.dispose();
 
     _bodyController.dispose();
     _notificationController.dispose();
@@ -377,8 +375,18 @@ class _PostsHomePageState extends State<PostsHomePage> {
         throw Exception("Failed to load posts.");
       }
       final data = jsonDecode(response.body) as List<dynamic>;
+      final lyrics = data.map((item) => Lyric.fromJson(item)).toList()
+        ..sort((a, b) {
+          final categoryComparison = a.category.toLowerCase().compareTo(
+                b.category.toLowerCase(),
+              );
+          if (categoryComparison != 0) {
+            return categoryComparison;
+          }
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        });
       setState(() {
-        _lyrics = data.map((item) => Lyric.fromJson(item)).toList();
+        _lyrics = lyrics;
       });
     } catch (err) {
       setState(() {
@@ -424,7 +432,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
     final category = _categoryController.text.trim();
-    final subCategory = _subCategoryController.text.trim();
     if (title.isEmpty || body.isEmpty) {
       setState(() {
         _error = _t("errorTitleBody");
@@ -442,7 +449,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
       "title": title,
       "teacher": _teacherController.text.trim(),
       "category": category,
-      "subCategory": subCategory,
       "body": body,
       "link": _linkController.text.trim(),
     };
@@ -660,27 +666,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
         SnackBar(content: Text(_t("failedDeleteSubcategory"))),
       );
     }
-  }
-
-  String? _selectedCategoryId() {
-    final selected = _categoryController.text.trim();
-    if (selected.isEmpty) return null;
-    final match = _categories.firstWhere(
-      (category) => category["name"]?.toString() == selected,
-      orElse: () => {},
-    );
-    return match["_id"]?.toString();
-  }
-
-  List<Map<String, dynamic>> get _visibleSubcategories {
-    final categoryId = _selectedCategoryId();
-    if (categoryId == null) {
-      return [];
-    }
-    return _subcategories
-        .where((subcategory) =>
-            subcategory["categoryId"]?.toString() == categoryId)
-        .toList();
   }
 
   Future<void> _addCategory(String name) async {
@@ -1336,7 +1321,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _teacherController.clear();
     _linkController.clear();
     _categoryController.clear();
-    _subCategoryController.clear();
 
     _bodyController.clear();
     setState(() {});
@@ -1348,7 +1332,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     _teacherController.text = lyric.teacher;
     _linkController.text = lyric.link;
     _categoryController.text = lyric.category;
-    _subCategoryController.text = lyric.subCategory;
 
     _bodyController.text = lyric.body;
     setState(() {});
@@ -1735,44 +1718,12 @@ class _PostsHomePageState extends State<PostsHomePage> {
                   ? null
                   : (value) {
                       _categoryController.text = value ?? "";
-                      _subCategoryController.clear();
-                      final categoryId = _selectedCategoryId();
-                      if (categoryId != null) {
-                        _fetchSubcategories(categoryId: categoryId);
-                      } else {
-                        _fetchSubcategories();
-                      }
                       setState(() {});
                     },
               decoration: InputDecoration(
                 labelText: _t("labelCategory"),
                 helperText:
                     _categories.isEmpty ? _t("addCategoriesDrawer") : null,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _subCategoryController.text.isEmpty
-                  ? null
-                  : _subCategoryController.text,
-              items: _visibleSubcategories
-                  .map((subcategory) => subcategory["name"]?.toString() ?? "")
-                  .where((name) => name.isNotEmpty)
-                  .map(
-                    (name) => DropdownMenuItem(
-                      value: name,
-                      child: Text(name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _visibleSubcategories.isEmpty
-                  ? null
-                  : (value) {
-                      _subCategoryController.text = value ?? "";
-                      setState(() {});
-                    },
-              decoration: InputDecoration(
-                labelText: _t("labelSubcategory"),
               ),
             ),
             const SizedBox(height: 12),
@@ -2158,7 +2109,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   }
 
   Widget _buildLyricTile(Lyric lyric) {
-    final subtitle = [lyric.teacher, lyric.category, lyric.subCategory]
+    final subtitle = [lyric.teacher, lyric.category]
         .where((value) => value.isNotEmpty)
         .join(" - ");
 
@@ -2213,7 +2164,6 @@ class Lyric {
     required this.body,
     required this.teacher,
     required this.category,
-    required this.subCategory,
     required this.link,
   });
 
@@ -2222,7 +2172,6 @@ class Lyric {
   final String body;
   final String teacher;
   final String category;
-  final String subCategory;
   final String link;
 
   factory Lyric.fromJson(Map<String, dynamic> json) {
@@ -2232,7 +2181,6 @@ class Lyric {
       body: json["body"]?.toString() ?? "",
       teacher: json["teacher"]?.toString() ?? "",
       category: json["category"]?.toString() ?? "",
-      subCategory: json["subCategory"]?.toString() ?? "",
       link: json["link"]?.toString() ?? "",
     );
   }
