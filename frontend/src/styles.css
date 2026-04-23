@@ -60,6 +60,152 @@ button {
   margin: 0 auto;
 }
 
+.app-dashboard {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.dashboard-main {
+  min-width: 0;
+}
+
+.dashboard-sidebar {
+  position: sticky;
+  top: 20px;
+  padding: 18px 14px;
+  background:
+    radial-gradient(circle at top right, rgba(153, 208, 195, 0.22), transparent 44%),
+    linear-gradient(160deg, rgba(31, 74, 110, 0.9), rgba(24, 35, 43, 0.94));
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.sidebar-collapsed {
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sidebar-brand {
+  min-width: 0;
+}
+
+.sidebar-brand .eyebrow {
+  margin-bottom: 2px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.sidebar-brand strong {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.sidebar-toggle {
+  min-width: 40px;
+  height: 40px;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-list-title {
+  margin: 10px 6px 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-list li {
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  min-height: 42px;
+  padding: 0 10px;
+  font-weight: 600;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.sidebar-foot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-action {
+  width: 100%;
+}
+
+.sidebar-collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar-collapsed .sidebar-list {
+  gap: 10px;
+}
+
+.sidebar-collapsed .sidebar-foot {
+  justify-items: center;
+}
+
+.sidebar-collapsed .sidebar-action {
+  width: 46px;
+  min-height: 42px;
+  padding: 0;
+}
+
 .login-app {
   max-width: 1180px;
 }
@@ -570,6 +716,14 @@ textarea {
 }
 
 @media (max-width: 1080px) {
+  .app-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    display: none;
+  }
+
   .hero,
   .login-panel,
   .dashboard-grid,

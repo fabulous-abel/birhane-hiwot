@@ -18,7 +18,6 @@ enum AppLanguage { en, am }
 const Map<AppLanguage, Map<String, String>> _strings = {
   AppLanguage.en: {
     "appTitle": "Posts Admin",
-    "importPdf": "Import PDF",
     "dashboard": "Dashboard",
     "postsLibrary": "Posts Library",
     "postsControl": "Posts Control",
@@ -74,7 +73,6 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "unnamed": "Unnamed",
     "close": "Close",
     "add": "Add",
-    "selectCategory": "Select category",
     "cancel": "Cancel",
     "continue": "Continue",
     "addCategoriesDrawer": "Add categories from the drawer.",
@@ -107,7 +105,6 @@ const Map<AppLanguage, Map<String, String>> _strings = {
   },
   AppLanguage.am: {
     "appTitle": "የጽሑፍ አስተዳዳሪ",
-    "importPdf": "PDF አስገባ",
     "dashboard": "ዳሽቦርድ",
     "postsLibrary": "የፖስቶች ቤተ-መዝገብ",
     "postsControl": "የፖስቶች አስተዳደር",
@@ -161,7 +158,6 @@ const Map<AppLanguage, Map<String, String>> _strings = {
     "unnamed": "ያልተሰየመ",
     "close": "ዝጋ",
     "add": "ጨምር",
-    "selectCategory": "ምድብ ምረጥ",
     "cancel": "ሰርዝ",
     "continue": "ቀጥል",
     "addCategoriesDrawer": "ምድቦችን ከመሳቢያው ይጨምሩ።",
@@ -329,6 +325,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
   List<AdminAccount> _adminAccounts = [];
   bool _loadingAdminList = false;
   String? _adminListError;
+  bool _sidebarCollapsed = false;
 
   String _t(String key) {
     return _strings[_language]?[key] ?? key;
@@ -1140,67 +1137,6 @@ class _PostsHomePageState extends State<PostsHomePage> {
     nameController.dispose();
   }
 
-  Future<void> _importPdf() async {
-    if (_categories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_t("addCategoryFirst"))),
-      );
-      return;
-    }
-    String? selectedCategory = _categories.first["name"]?.toString();
-    final category = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(_t("selectCategory")),
-          content: StatefulBuilder(
-            builder: (context, setState) {
-              return DropdownButtonFormField<String>(
-                value: selectedCategory,
-                items: _categories
-                    .map((category) => category["name"]?.toString() ?? "")
-                    .where((name) => name.isNotEmpty)
-                    .map(
-                      (name) => DropdownMenuItem(
-                        value: name,
-                        child: Text(name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedCategory = value;
-                  });
-                },
-                decoration: InputDecoration(labelText: _t("labelCategory")),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_t("cancel")),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context, selectedCategory?.trim());
-              },
-              child: Text(_t("continue")),
-            ),
-          ],
-        );
-      },
-    );
-    if (category == null || category.isEmpty) {
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("PDF import is only available on the web admin."),
-      ),
-    );
-  }
-
   Future<bool> _createAdminAccount({
     required String username,
     required String password,
@@ -1337,18 +1273,39 @@ class _PostsHomePageState extends State<PostsHomePage> {
     setState(() {});
   }
 
+  void _openSubcategoryManagerFromNav() {
+    if (_categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t("addCategoryFirst"))),
+      );
+      return;
+    }
+    _fetchSubcategories(categoryId: _categories.first["_id"]?.toString());
+    _showSubcategoryManager();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isWideScreen = MediaQuery.of(context).size.width >= 1100;
     return Scaffold(
-      drawer: _buildDrawer(),
+      drawer: isWideScreen ? null : _buildDrawer(),
       appBar: AppBar(
         title: Text(_t("appTitle")),
         actions: [
-          IconButton(
-            tooltip: _t("importPdf"),
-            onPressed: _importPdf,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-          ),
+          if (isWideScreen)
+            IconButton(
+              tooltip: _sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar",
+              icon: Icon(
+                _sidebarCollapsed
+                    ? Icons.keyboard_double_arrow_right
+                    : Icons.keyboard_double_arrow_left,
+              ),
+              onPressed: () {
+                setState(() {
+                  _sidebarCollapsed = !_sidebarCollapsed;
+                });
+              },
+            ),
           TextButton(
             onPressed: () {
               setState(() {
@@ -1377,33 +1334,40 @@ class _PostsHomePageState extends State<PostsHomePage> {
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 1100;
             if (isWide) {
-              return Column(
+              return Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-                    child: _buildHeroSection(isWide: true),
-                  ),
+                  _buildSidebarPanel(),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                          child: _buildHeroSection(isWide: true),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFormCard(),
-                                const SizedBox(height: 16),
-                                _buildBroadcastCard(),
-                                const SizedBox(height: 16),
-                                _buildBroadcastHistoryCard(),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      _buildFormCard(),
+                                      const SizedBox(height: 16),
+                                      _buildBroadcastCard(),
+                                      const SizedBox(height: 16),
+                                      _buildBroadcastHistoryCard(),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(child: _buildListCard(isEmbedded: false)),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 24),
-                          Expanded(child: _buildListCard(isEmbedded: false)),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1431,6 +1395,156 @@ class _PostsHomePageState extends State<PostsHomePage> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildSidebarPanel() {
+    final width = _sidebarCollapsed ? 82.0 : 250.0;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      width: width,
+      margin: const EdgeInsets.fromLTRB(16, 16, 0, 16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_brandOcean, _brandInk],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: _brandInk.withOpacity(0.18),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            _sidebarCollapsed ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: _sidebarCollapsed ? 0 : 18),
+            child: Row(
+              mainAxisAlignment: _sidebarCollapsed
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.spaceBetween,
+              children: [
+                if (!_sidebarCollapsed)
+                  Expanded(
+                    child: Text(
+                      _t("postsControl"),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                IconButton(
+                  tooltip:
+                      _sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar",
+                  onPressed: () {
+                    setState(() {
+                      _sidebarCollapsed = !_sidebarCollapsed;
+                    });
+                  },
+                  icon: Icon(
+                    _sidebarCollapsed
+                        ? Icons.keyboard_double_arrow_right
+                        : Icons.keyboard_double_arrow_left,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildSidebarNavItem(
+            icon: Icons.dashboard_outlined,
+            label: _t("dashboard"),
+            onTap: () {},
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.category_outlined,
+            label: _t("categories"),
+            onTap: _showCategoryManager,
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.account_tree_outlined,
+            label: _t("subcategoriesDialogTitle"),
+            onTap: _openSubcategoryManagerFromNav,
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.person_add_alt_1_outlined,
+            label: _t("addAdmin"),
+            onTap: _showAddAdminDialog,
+          ),
+          _buildSidebarNavItem(
+            icon: Icons.settings_outlined,
+            label: _t("settings"),
+            onTap: () {},
+          ),
+          const Spacer(),
+          if (!_sidebarCollapsed)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                _t("offlineFirstAdmin"),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withOpacity(0.78),
+                    ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarNavItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final item = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: _sidebarCollapsed ? 0 : 14,
+            vertical: 11,
+          ),
+          child: Row(
+            mainAxisAlignment:
+                _sidebarCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+            children: [
+              Icon(icon, color: Colors.white.withOpacity(0.92), size: 21),
+              if (!_sidebarCollapsed) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _sidebarCollapsed ? 8 : 12, vertical: 4),
+      child: _sidebarCollapsed ? Tooltip(message: label, child: item) : item,
     );
   }
 
@@ -1475,15 +1589,7 @@ class _PostsHomePageState extends State<PostsHomePage> {
             label: _t("subcategoriesDialogTitle"),
             onTap: () {
               Navigator.of(context).pop();
-              if (_categories.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(_t("addCategoryFirst"))),
-                );
-                return;
-              }
-              _fetchSubcategories(
-                  categoryId: _categories.first["_id"]?.toString());
-              _showSubcategoryManager();
+              _openSubcategoryManagerFromNav();
             },
           ),
           _buildDrawerItem(

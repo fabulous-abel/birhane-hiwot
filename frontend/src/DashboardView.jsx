@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+
 function Panel({ eyebrow, title, subtitle, actions, children }) {
   return (
     <section className="panel section-panel">
@@ -59,6 +61,7 @@ export default function DashboardView(props) {
     onResetPostForm,
     onPostSubmit,
     onBulkPostSubmit,
+    onBulkFileUpload,
     onUseBulkExample,
     onNotificationSubmit,
     onNotificationDelete,
@@ -77,11 +80,117 @@ export default function DashboardView(props) {
     onAdminCreate,
     onDeleteAdmin
   } = props;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const topRef = useRef(null);
+  const notificationRef = useRef(null);
+  const libraryRef = useRef(null);
+  const taxonomyRef = useRef(null);
+  const adminsRef = useRef(null);
+
+  function scrollToSection(ref) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
-    <div className="shell">
-      <main className="app">
-        <header className="panel hero">
+    <div className="shell shell-dashboard">
+      <main className={`app app-dashboard ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+        <aside className="panel dashboard-sidebar">
+          <div className="sidebar-head">
+            {!sidebarCollapsed ? (
+              <div className="sidebar-brand">
+                <p className="eyebrow">Control</p>
+                <strong>Posts Dashboard</strong>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="mini-button sidebar-toggle"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? ">>" : "<<"}
+            </button>
+          </div>
+
+          <nav className="sidebar-nav" aria-label="Dashboard sections">
+            {!sidebarCollapsed ? <p className="sidebar-list-title">Tasks</p> : null}
+            <ul className="sidebar-list">
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-link"
+                  onClick={() => scrollToSection(taxonomyRef)}
+                >
+                  <span className="sidebar-icon">CS</span>
+                  {!sidebarCollapsed ? <span>Categories and subcategories</span> : null}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-link"
+                  onClick={() => scrollToSection(notificationRef)}
+                >
+                  <span className="sidebar-icon">SN</span>
+                  {!sidebarCollapsed ? <span>Send a notification</span> : null}
+                </button>
+              </li>
+              <li>
+                <button type="button" className="sidebar-link" onClick={onScrollToBulkCreate}>
+                  <span className="sidebar-icon">CP</span>
+                  {!sidebarCollapsed ? <span>Create many posts</span> : null}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-link"
+                  onClick={() => scrollToSection(adminsRef)}
+                >
+                  <span className="sidebar-icon">AA</span>
+                  {!sidebarCollapsed ? <span>Admin accounts</span> : null}
+                </button>
+              </li>
+            </ul>
+
+            {!sidebarCollapsed ? <p className="sidebar-list-title">Browse</p> : null}
+            <ul className="sidebar-list">
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-link"
+                  onClick={() => scrollToSection(topRef)}
+                >
+                  <span className="sidebar-icon">DB</span>
+                  {!sidebarCollapsed ? <span>Dashboard</span> : null}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="sidebar-link"
+                  onClick={() => scrollToSection(libraryRef)}
+                >
+                  <span className="sidebar-icon">LB</span>
+                  {!sidebarCollapsed ? <span>Library</span> : null}
+                </button>
+              </li>
+            </ul>
+          </nav>
+
+          <div className="sidebar-foot">
+            <button type="button" className="button secondary sidebar-action" onClick={onRefresh}>
+              {sidebarCollapsed ? "R" : "Refresh"}
+            </button>
+            <button type="button" className="button ghost sidebar-action" onClick={onLogout}>
+              {sidebarCollapsed ? "L" : "Log out"}
+            </button>
+          </div>
+        </aside>
+
+        <div className="dashboard-main">
+        <header ref={topRef} className="panel hero">
           <div className="hero-copy">
             <p className="eyebrow">React Admin</p>
             <h1>Curate the posts catalog with guarded admin access.</h1>
@@ -317,7 +426,7 @@ export default function DashboardView(props) {
             <Panel
               eyebrow="Multi Create"
               title="Create many posts"
-              subtitle="Paste a JSON array and create multiple posts in one request."
+              subtitle="Paste JSON or upload files to create multiple posts in one request."
               actions={
                 <button type="button" className="mini-button" onClick={onUseBulkExample}>
                   Load example
@@ -329,6 +438,20 @@ export default function DashboardView(props) {
                   Required for each item: <code>title</code>, <code>category</code>,
                   and <code>body</code>. <code>tags</code> can be an array or a comma
                   separated string.
+                </p>
+
+                <label className="field">
+                  <span>Upload files (auto post all)</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".json,.txt,.doc,.docx,application/json,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={onBulkFileUpload}
+                    disabled={busy.bulk}
+                  />
+                </label>
+                <p className="helper-copy">
+                  Uploading will immediately process files and post all detected entries.
                 </p>
 
                 <label className="field">
@@ -366,6 +489,7 @@ export default function DashboardView(props) {
               </form>
             </Panel>
 
+            <div ref={notificationRef}>
             <Panel
               eyebrow="Broadcast"
               title="Send a notification"
@@ -392,6 +516,7 @@ export default function DashboardView(props) {
                 </div>
               </form>
             </Panel>
+            </div>
 
             <Panel
               eyebrow="History"
@@ -423,6 +548,7 @@ export default function DashboardView(props) {
           </div>
 
           <div className="column">
+            <div ref={libraryRef}>
             <Panel
               eyebrow="Library"
               title="Posts library"
@@ -493,7 +619,9 @@ export default function DashboardView(props) {
                 )}
               </div>
             </Panel>
+            </div>
 
+            <div ref={taxonomyRef}>
             <Panel
               eyebrow="Taxonomy"
               title="Categories and subcategories"
@@ -705,7 +833,9 @@ export default function DashboardView(props) {
                 </div>
               </div>
             </Panel>
+            </div>
 
+            <div ref={adminsRef}>
             <Panel
               eyebrow="Access"
               title="Admin accounts"
@@ -777,7 +907,9 @@ export default function DashboardView(props) {
                 )}
               </div>
             </Panel>
+            </div>
           </div>
+        </div>
         </div>
       </main>
     </div>

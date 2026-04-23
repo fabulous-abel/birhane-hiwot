@@ -141,6 +141,166 @@ function normalizeBulkPosts(rawValue) {
   });
 }
 
+function cleanBulkText(rawValue) {
+  return (rawValue || "")
+    .replace(/\u0000/g, "")
+    .replace(/[^\S\r\n]+/g, " ")
+    .trim();
+}
+
+const MAX_IMPORTED_BODY_CHARS = 12000;
+
+const BINARY_EXTENSIONS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "ppt",
+  "pptx",
+  "xls",
+  "xlsx",
+  "zip",
+  "rar",
+  "7z",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "mp3",
+  "mp4",
+  "wav",
+  "avi",
+  "mov"
+]);
+const DISABLED_UPLOAD_EXTENSIONS = new Set(["pdf"]);
+
+function getFileExtension(fileName = "") {
+  const index = fileName.lastIndexOf(".");
+  if (index < 0) return "";
+  return fileName.slice(index + 1).toLowerCase();
+}
+
+function hasKnownBinarySignature(bytes) {
+  if (bytes.length >= 4) {
+    // ZIP family (docx/xlsx/pptx)
+    if (bytes[0] === 0x50 && bytes[1] === 0x4b) return true;
+    // PDF
+    if (
+      bytes[0] === 0x25 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x44 &&
+      bytes[3] === 0x46
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function looksBinary(bytes) {
+  const sampleSize = Math.min(bytes.length, 1024);
+  if (sampleSize === 0) return false;
+
+  let suspicious = 0;
+  for (let index = 0; index < sampleSize; index += 1) {
+    const value = bytes[index];
+    if (value === 0) return true;
+    if (value < 7 || (value > 14 && value < 32)) {
+      suspicious += 1;
+    }
+  }
+  return suspicious / sampleSize > 0.2;
+}
+
+function buildBinaryFileBody(fileName, extension) {
+  const fileType = extension ? extension.toUpperCase() : "binary";
+  return [
+    `Imported file: ${fileName}`,
+    "",
+    `${fileType} content detected.`,
+    "Binary files are skipped from raw text conversion to avoid corrupted characters.",
+    "If you need exact text, convert this file to TXT/JSON (or copy-paste the text) and upload again."
+  ].join("\n");
+}
+
+function normalizeImportedBody(rawBody) {
+  const cleaned = cleanBulkText(rawBody);
+  if (!cleaned) return "Imported from uploaded file.";
+  if (cleaned.length <= MAX_IMPORTED_BODY_CHARS) return cleaned;
+  return `${cleaned.slice(0, MAX_IMPORTED_BODY_CHARS)}\n\n[Truncated during import]`;
+}
+
+function sanitizeBulkDraftPost(item, fallbackCategory = "", fallbackBody = "") {
+  return {
+    title: item.title?.toString().trim() || "Untitled",
+    teacher: item.teacher?.toString().trim() || "",
+    link: item.link?.toString().trim() || "",
+    category: item.category?.toString().trim() || fallbackCategory || "General",
+    subCategory: item.subCategory?.toString().trim() || "",
+    language: item.language?.toString().trim() || "",
+    tags: Array.isArray(item.tags)
+      ? item.tags.map((tag) => tag?.toString?.() ?? "").filter(Boolean)
+      : typeof item.tags === "string"
+        ? splitTags(item.tags)
+        : [],
+    body: normalizeImportedBody(
+      item.body?.toString().trim() || fallbackBody || "Imported from uploaded file."
+    )
+  };
+}
+
+async function readBulkPostsFromFiles(files, fallbackCategory = "") {
+  const createdPosts = [];
+  for (const file of files) {
+    const fileName = file?.name?.toString() || "Uploaded file";
+    const extension = getFileExtension(fileName);
+    if (DISABLED_UPLOAD_EXTENSIONS.has(extension)) {
+      continue;
+    }
+    const titleFromFile = fileName.replace(/\.[^/.]+$/, "").trim() || "Untitled";
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const isBinary =
+      BINARY_EXTENSIONS.has(extension) ||
+      hasKnownBinarySignature(bytes) ||
+      looksBinary(bytes);
+    const fileText = isBinary
+      ? ""
+      : cleanBulkText(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
+
+    if (!fileText && !isBinary) continue;
+
+    try {
+      if (fileText) {
+        const parsedFromFile = normalizeBulkPosts(fileText).map((item) =>
+          sanitizeBulkDraftPost(item, fallbackCategory)
+        );
+        createdPosts.push(...parsedFromFile);
+        continue;
+      }
+    } catch {
+      // Fallback to a single generated post below.
+    }
+
+    {
+      const fallbackBody = isBinary
+        ? buildBinaryFileBody(fileName, extension)
+        : fileText || `Imported file: ${fileName}`;
+      createdPosts.push(
+        sanitizeBulkDraftPost(
+          {
+            title: titleFromFile,
+            category: fallbackCategory
+          },
+          fallbackCategory,
+          fallbackBody
+        )
+      );
+    }
+  }
+
+  return createdPosts;
+}
+
 async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
@@ -563,6 +723,47 @@ export default function App() {
     }
   }
 
+  async function handleBulkFileUpload(event) {
+    const files = Array.from(event?.target?.files || []);
+    const token = ensureToken();
+    if (!token || !files.length) return;
+
+    setBusy((current) => ({ ...current, bulk: true }));
+    try {
+      const fallbackCategory = categories[0]?.name?.toString() || "";
+      const postsToCreate = await readBulkPostsFromFiles(files, fallbackCategory);
+
+      if (!postsToCreate.length) {
+        throw new Error("No posts could be created from uploaded files.");
+      }
+
+      // Keep a visible JSON draft of what was generated from files.
+      setBulkPostsInput(JSON.stringify(postsToCreate, null, 2));
+
+      await apiFetch("/api/posts/bulk", {
+        method: "POST",
+        body: JSON.stringify({ posts: postsToCreate }),
+        authToken: token
+      });
+      const [freshPosts, freshNotifications] = await Promise.all([
+        loadPosts(),
+        loadNotifications()
+      ]);
+      setPosts(freshPosts);
+      setNotifications(freshNotifications);
+      setBulkPostsInput("");
+      setNotice({
+        tone: "success",
+        text: `${postsToCreate.length} posts created from ${files.length} uploaded file(s).`
+      });
+    } catch (error) {
+      if (!handleProtectedError(error)) setNotice({ tone: "danger", text: error.message });
+    } finally {
+      event.target.value = "";
+      setBusy((current) => ({ ...current, bulk: false }));
+    }
+  }
+
   async function handleDeletePost(post) {
     if (!window.confirm(`Delete "${post.title || "this post"}"?`)) return;
     const token = ensureToken();
@@ -856,6 +1057,7 @@ export default function App() {
       onResetPostForm={resetPostForm}
       onPostSubmit={handlePostSubmit}
       onBulkPostSubmit={handleBulkPostSubmit}
+      onBulkFileUpload={handleBulkFileUpload}
       onUseBulkExample={() => setBulkPostsInput(bulkPostsExample)}
       onNotificationSubmit={handleNotificationSubmit}
       onNotificationDelete={handleDeleteNotification}
